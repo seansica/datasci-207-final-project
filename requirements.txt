@@ -4,3 +4,4 @@ matplotlib
 tensorflow
 seaborn
 scikit-learn
+tabulate
