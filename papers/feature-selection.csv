@@ -1,0 +1,52 @@
+Label,Feature,Weight
+Benign,B.Packet Len Min,0.0479
+Benign,Subflow F.Bytes,0.0007
+Benign,Total Len F.Packets,0.0004
+Benign,F.Packet Len Mean,0.0002
+DoS GoldenEye,B.Packet Len Std,0.1585
+DoS GoldenEye,Flow IAT Min,0.0317
+DoS GoldenEye,Fwd IAT Min,0.0257
+DoS GoldenEye,Flow IAT Mean,0.0214
+Heartbleed,B.Packet Len Std,0.2028
+Heartbleed,Subflow F.Bytes,0.1367
+Heartbleed,Flow Duration,0.0991
+Heartbleed,Total Len F.Packets,0.0903
+DoS Hulk,B.Packet Len Std,0.2028
+DoS Hulk,B.Packet Len Std,0.1277
+DoS Hulk,Flow Duration,0.0437
+DoS Hulk,Flow IAT Std,0.0227
+DoS Slowhttp,Flow Duration,0.0443
+DoS Slowhttp,Active Min,0.0228
+DoS Slowhttp,Active Mean,0.0219
+DoS Slowhttp,Flow IAT Std,0.0200
+DoS slowloris,Flow Duration,0.0431
+DoS slowloris,F.IAT Min,0.0378
+DoS slowloris,B.IAT Mean,0.0300
+DoS slowloris,F.IAT Mean,0.0265
+SSH-Patator,Init Win F.Bytes,0.0079
+SSH-Patator,Subflow F.Bytes,0.0052
+SSH-Patator,Total Len F.Packets,0.0034
+SSH-Patator,ACK Flag Count,0.0007
+FTP-Patator,Init Win F.Bytes,0.0077
+FTP-Patator,F.PSH Flags,0.0062
+FTP-Patator,SYN Flag Count,0.0061
+FTP-Patator,F.Packets/s,0.0014
+Web Attack,Init Win F.Bytes,0.0200
+Web Attack,Subflow F.Bytes,0.0145
+Web Attack,Init Win B.Bytes,0.0129
+Web Attack,Total Len F.Packets,0.0096
+Infiltration,Subflow F.Bytes,4.3012
+Infiltration,Total Len F.Packets,2.8427
+Infiltration,Flow Duration,0.0657
+Infiltration,Active Mean,0.0227
+Bot,Subflow F.Bytes,0.0239
+Bot,Total Len F.Packets,0.0158
+Bot,F.Packet Len Mean,0.0025
+Bot,B.Packets/s,0.0021
+PortScan,Init Win F.Bytes,0.0083
+PortScan,B.Packets/s,0.0032
+PortScan,PSH Flag Count,0.0009
+DDoS,B.Packet Len Std,0.1728
+DDoS,Avg Packet Size,0.0162
+DDoS,Flow Duration,0.0137
+DDoS,Flow IAT Std,0.0086
