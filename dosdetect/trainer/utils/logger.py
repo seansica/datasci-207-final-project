@@ -1,5 +1,7 @@
 import logging
 
+LOG_DIR = 'logs'
+
 def setup_logger(name, log_file, level=logging.INFO):
     """
     Set up a logger with the specified name, log file, and logging level.
@@ -17,7 +19,7 @@ def setup_logger(name, log_file, level=logging.INFO):
 
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    file_handler = logging.FileHandler(log_file)
+    file_handler = logging.FileHandler(f'{LOG_DIR}/{log_file}')
     file_handler.setFormatter(formatter)
 
     stream_handler = logging.StreamHandler()

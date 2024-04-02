@@ -4,7 +4,7 @@ from setuptools import setup
 REQUIRED_PACKAGES = ['tensorflow>=2.3']
 
 setup(
-    name='ddos_detection',
+    name='dosdetect',
     version='0.1',
     install_requires=REQUIRED_PACKAGES,
     packages=find_packages(),

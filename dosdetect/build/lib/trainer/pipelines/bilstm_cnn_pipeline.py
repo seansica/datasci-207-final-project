@@ -45,8 +45,8 @@ class BiLSTMCNNPipeline:
         logger.info(f"Data loaded. Shape: {all_data.shape}")
 
         # Extract features (X) and labels (y) from the loaded data
-        X = all_data.drop(columns=['label', 'source_file'])
-        y = all_data['label']
+        X = all_data.drop(columns=[' Label'])
+        y = all_data[' Label']
         logger.debug("Features (X) and labels (y) extracted from the loaded data.")
 
         # Build the preprocessor with specified preprocessing steps

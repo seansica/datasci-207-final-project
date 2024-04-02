@@ -158,7 +158,7 @@ class Preprocessor:
         y_categorical = to_categorical(y_encoded, num_classes=num_classes)
         
         logger.debug("Label encoding completed.")
-        return y_categorical
+        return y_categorical, label_mapping
 
     def sanitize_column_names(self, X):
         """
@@ -172,13 +172,15 @@ class Preprocessor:
         """
         logger.debug("Sanitizing column names...")
         # Convert column names to lowercase
-        X.columns = X.columns.str.lower()
+        # X.columns = X.columns.str.lower()
         
         # Replace non-alphanumeric characters with underscores
-        X.columns = X.columns.map(lambda x: re.sub(r'[^a-z0-9]+', '_', x))
+        # X.columns = X.columns.map(lambda x: re.sub(r'[^a-z0-9]+', '_', x))
+        
+        X_sanitized = X.columns.str.strip().str.replace(' ', '_').str.replace('-', '_').str.lower()
         
         logger.debug("Column names sanitized.")
-        return X
+        return X_sanitized
 
 class CorrelatedFeatureRemover:
     """
@@ -292,29 +294,30 @@ class DataCleaner:
             pandas.DataFrame: The cleaned dataset with infinite and NaN values handled.
         """
         logger.debug("Cleaning data...")
-        # Check for infinite values
-        infinite_mask = np.isinf(data)
-        
-        # Check for NaN values
-        nan_mask = np.isnan(data)
-        
-        # Combine the masks
-        mask = np.logical_or(infinite_mask, nan_mask)
-        
-        # Get the columns with infinite or NaN values
-        columns_to_clean = data.columns[mask.any()]
-        
-        # Clean the data based on the selected fill method
-        cleaned_data = data.copy()
-        for column in columns_to_clean:
-            if self.fill_method == 'median':
-                fill_value = data[column][~mask[column]].median()
-            elif self.fill_method == 'mean':
-                fill_value = data[column][~mask[column]].mean()
-            else:
-                fill_value = 0
-            
-            cleaned_data[column] = data[column].replace([np.inf, -np.inf, np.nan], fill_value)
-        
-        logger.debug(f"Data cleaning completed. Cleaned {len(columns_to_clean)} columns.")
-        return cleaned_data
+
+        # Check for infinite values in the dataset
+        if np.any(np.isinf(data)):
+            # Check for infinite values
+            infinite_ = data.columns.to_series()[np.isinf(data).any()]
+
+            # Get unique feature names with infinite values
+            infinite_features = np.unique(infinite_.index.values)
+
+            # Replace infinite values with NaN
+            data = data.replace([np.inf, -np.inf], np.nan)
+
+            # Fill NaN values based on the selected fill method
+            for feature_name in infinite_features:
+                if self.fill_method == 'median':
+                    fill_value = data[feature_name].median()
+                elif self.fill_method == 'mean':
+                    fill_value = data[feature_name].mean()
+                elif self.fill_method == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = self.fill_method
+
+                data[feature_name].fillna(fill_value, inplace=True)
+
+        logger.debug(f"Data cleaning completed.")
+        return data
