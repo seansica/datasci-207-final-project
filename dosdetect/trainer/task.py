@@ -1,11 +1,11 @@
 import argparse
-from trainer.pipelines.bilstm_cnn_pipeline import BiLSTMCNNPipeline
-from trainer.pipelines.knn_pipeline import KNNPipeline
-
 import logging
-from trainer.utils.logger import setup_logger
 
-logger = setup_logger('task_logger', 'task.log', level=logging.DEBUG)
+from .config import Config
+from .utils.logger import setup_logger
+
+from .pipelines.bilstm_cnn_pipeline import BiLSTMCNNPipeline
+from .pipelines.knn_pipeline import KNNPipeline
 
 
 def parse_arguments():
@@ -18,7 +18,15 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Run KNN or BiLSTM-CNN pipeline.')
     parser.add_argument('--pipeline', type=str, default='bilstm-cnn', choices=['knn', 'bilstm-cnn'],
                         help='Choose the pipeline to run: "knn" or "bilstm-cnn" (default: "bilstm-cnn")')
+    parser.add_argument('--log-dir', type=str, default='logs',
+                        help='Directory to store log files (default: "~/.dosdetect/logs")')
+    parser.add_argument('--model-dir', type=str, default='models',
+                        help='Directory to save trained models (default: "~/.dosdetect/models")')
     args = parser.parse_args()
+
+    Config.set_log_dir(args.log_dir)
+    Config.set_model_dir(args.model_dir)
+
     return args
 
 
@@ -27,6 +35,10 @@ def main():
     Main function to run the selected pipeline.
     """
     args = parse_arguments()
+
+    # Note that parse_arguments must be called before setting up the logger because the log directory is set in the args
+    logger = setup_logger('task_logger', 'task.log', level=logging.DEBUG)
+
     logger.info(f"Starting {args.pipeline} pipeline...")
 
     root_path = '/Users/seansica/OneDrive - Sica/Education/Berkeley/W207-Applied-ML/datasci-207-final-project/datasets/CICIDS2017/MachineLearningCVE'

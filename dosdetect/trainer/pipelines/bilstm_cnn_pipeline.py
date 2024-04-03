@@ -1,9 +1,11 @@
-from trainer.data.data_loader import DataLoader
-from trainer.preprocessing.preprocessor import PreprocessorBuilder
-from trainer.models.bilstm_cnn import BiLSTMCNN
-from trainer.utils.evaluation import Evaluator
-
+import os
 import logging
+
+from ..config import Config
+from ..data.data_loader import DataLoader
+from ..preprocessing.preprocessor import PreprocessorBuilder
+from ..models.bilstm_cnn import BiLSTMCNN
+from ..utils.evaluation import Evaluator
 from ..utils.logger import setup_logger
 
 logger = setup_logger('bilstm_cnn_pipeline_logger', 'bilstm_cnn_pipeline.log', level=logging.DEBUG)
@@ -26,7 +28,11 @@ class BiLSTMCNNPipeline:
         self.file_paths = file_paths
         self.correlation_threshold = correlation_threshold
         self.pca_variance_ratio = pca_variance_ratio
+        
+        self.model_dir = Config.MODEL_DIR
+        
         logger.debug(f"BiLSTMCNNPipeline initialized with file paths: {file_paths}, "
+                     f"model directory: {self.model_dir}, "
                      f"correlation threshold: {correlation_threshold}, "
                      f"PCA variance ratio: {pca_variance_ratio}")
 
@@ -77,23 +83,30 @@ class BiLSTMCNNPipeline:
         # Create the BiLSTM-CNN model
         input_shape = (X_train.shape[1], 1)
         bilstm_cnn = BiLSTMCNN(input_shape, num_classes)
-        model = bilstm_cnn.create_model()
+        bilstm_cnn.build_model()
         logger.info("BiLSTM-CNN model created.")
 
-        # Set the number of training epochs
         epochs = 10
-
-        # Compile the model
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        batch_size = 32
+        bilstm_cnn.compile_model(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         logger.debug("Model compiled with Adam optimizer, categorical cross-entropy loss, and accuracy metric.")
 
-        # Train the model
         logger.info(f"Training the model for {epochs} epochs...")
-        model.fit(X_train, y_train, epochs=epochs, validation_data=(X_val, y_val))
+        bilstm_cnn.train_model(X_train, 
+                               y_train, 
+                               epochs=epochs, 
+                               batch_size=batch_size, 
+                               validation_data=(X_val, y_val))
         logger.info("Model training completed.")
 
+        test_loss, test_accuracy = bilstm_cnn.evaluate_model(X_test, y_test)
+        logger.info(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
+
+        bilstm_cnn.save_model(self.model_dir)
+        logger.info("Model saved.")
+
         # Create an Evaluator instance
-        evaluator = Evaluator(model)
+        evaluator = Evaluator(bilstm_cnn.model)
         logger.debug("Evaluator created.")
 
         # Evaluate the model on the test set

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.decomposition import PCA
 from tensorflow.keras.utils import to_categorical
@@ -171,16 +172,17 @@ class Preprocessor:
             pandas.DataFrame: The input features with sanitized column names.
         """
         logger.debug("Sanitizing column names...")
-        # Convert column names to lowercase
-        # X.columns = X.columns.str.lower()
         
-        # Replace non-alphanumeric characters with underscores
-        # X.columns = X.columns.map(lambda x: re.sub(r'[^a-z0-9]+', '_', x))
-        
-        X_sanitized = X.columns.str.strip().str.replace(' ', '_').str.replace('-', '_').str.lower()
+        # Modify column names in place:
+        #   - Convert column names to lowercase
+        #   - Replace non-alphanumeric characters with underscores
+        #   - Strip leading and trailing whitespaces
+        X.columns = X.columns.str.strip().str.replace(' ', '_').str.replace('-', '_').str.lower()
         
         logger.debug("Column names sanitized.")
-        return X_sanitized
+        
+        # Return the modified DataFrame
+        return X
 
 class CorrelatedFeatureRemover:
     """
@@ -295,29 +297,28 @@ class DataCleaner:
         """
         logger.debug("Cleaning data...")
 
-        # Check for infinite values in the dataset
-        if np.any(np.isinf(data)):
-            # Check for infinite values
-            infinite_ = data.columns.to_series()[np.isinf(data).any()]
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError(f"Expected a pandas DataFrame, but got {type(data)} instead.")
 
-            # Get unique feature names with infinite values
-            infinite_features = np.unique(infinite_.index.values)
+        # Replace infinite values with NaN using pandas methods
+        data.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-            # Replace infinite values with NaN
-            data = data.replace([np.inf, -np.inf], np.nan)
-
-            # Fill NaN values based on the selected fill method
-            for feature_name in infinite_features:
+        # Check and fill NaN values based on the selected fill method
+        for column in data.columns:
+            if data[column].isnull().any():  # Check if there are any NaN values in the column
                 if self.fill_method == 'median':
-                    fill_value = data[feature_name].median()
+                    fill_value = data[column].median()
                 elif self.fill_method == 'mean':
-                    fill_value = data[feature_name].mean()
+                    fill_value = data[column].mean()
                 elif self.fill_method == 'zero':
                     fill_value = 0
                 else:
-                    fill_value = self.fill_method
+                    # Assuming self.fill_method is a callable that returns a scalar
+                    # This path needs specific handling based on what self.fill_method is
+                    fill_value = self.fill_method(data[column])
 
-                data[feature_name].fillna(fill_value, inplace=True)
+                # Assign the result of fillna directly to the DataFrame column
+                data[column] = data[column].fillna(fill_value)
 
-        logger.debug(f"Data cleaning completed.")
+        logger.debug("Data cleaning completed.")
         return data

@@ -1,6 +1,12 @@
 # models/knn.py
-from sklearn.neighbors import KNeighborsClassifier
+from datetime import datetime
 import logging
+import json
+import os
+import joblib
+from sklearn.neighbors import KNeighborsClassifier
+
+from ..config import Config
 from ..utils.logger import setup_logger
 
 logger = setup_logger('knn_logger', 'knn.log', level=logging.DEBUG)
@@ -8,7 +14,7 @@ logger = setup_logger('knn_logger', 'knn.log', level=logging.DEBUG)
 
 class KNN:
     """
-    A class for creating and training a K-Nearest Neighbors (KNN) model.
+    A class for creating and managing a K-Nearest Neighbors (KNN) model.
     """
 
     def __init__(self, n_neighbors=5):
@@ -19,8 +25,16 @@ class KNN:
             n_neighbors (int): Number of neighbors to consider. Defaults to 5.
         """
         self.n_neighbors = n_neighbors
-        self.model = KNeighborsClassifier(n_neighbors=n_neighbors)
+        self.model = None
         logger.debug(f"KNN initialized with n_neighbors={n_neighbors}")
+
+    def build_model(self):
+        """
+        Build the KNN model.
+        """
+        logger.info("Building KNN model...")
+        self.model = KNeighborsClassifier(n_neighbors=self.n_neighbors)
+        logger.info("KNN model built.")
 
     def train(self, X_train, y_train):
         """
@@ -48,3 +62,44 @@ class KNN:
         predictions = self.model.predict(X)
         logger.info("Predictions completed.")
         return predictions
+
+    def save_model(self, model_dir, timestamp=datetime.now().strftime("%Y%m%d%H%M%S"), model_filename="knn_model"):
+        """
+        Save the trained KNN model to a file.
+
+        Args:
+            model_dir (str): Directory to save the model file.
+        """
+        # Ensure the target directory exists
+        expanded_model_dir = os.path.expanduser(model_dir)
+        try:
+            os.makedirs(expanded_model_dir, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Error creating directories: {e}")
+
+        model_filename = f"{model_filename}_{timestamp}.pkl"
+        model_path = os.path.join(expanded_model_dir, model_filename)
+        joblib.dump(self.model, model_path)
+
+        # Create a companion file with model configuration details
+        companion_filename = f"{model_filename}_{timestamp}.json"
+        companion_path = os.path.join(model_dir, companion_filename)
+        model_config = {
+            "n_neighbors": self.n_neighbors
+        }
+        with open(companion_path, "w") as file:
+            json.dump(model_config, file, indent=4)
+
+        logger.info(f"KNN model saved to {model_path}")
+        logger.info(f"Model configuration saved to {companion_path}")
+        return model_filename
+
+    def load_model(self, model_path):
+        """
+        Load the trained KNN model from a file.
+
+        Args:
+            model_path (str): Path to the saved model file.
+        """
+        self.model = joblib.load(model_path)
+        logger.info(f"KNN model loaded from {model_path}")

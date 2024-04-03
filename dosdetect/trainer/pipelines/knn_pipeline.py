@@ -1,11 +1,14 @@
 # pipelines/knn_pipeline.py
-from trainer.data.data_loader import DataLoader
-from trainer.preprocessing.preprocessor import PreprocessorBuilder
-from trainer.models.knn import KNN
-from trainer.utils.evaluation import Evaluator
-
+from datetime import datetime
 import logging
-from trainer.utils.logger import setup_logger
+import os
+
+from ..config import Config
+from ..data.data_loader import DataLoader
+from ..preprocessing.preprocessor import PreprocessorBuilder
+from ..models.knn import KNN
+from ..utils.evaluation import Evaluator
+from ..utils.logger import setup_logger
 
 logger = setup_logger('knn_pipeline_logger', 'knn_pipeline.log', level=logging.DEBUG)
 
@@ -29,6 +32,9 @@ class KNNPipeline:
         self.correlation_threshold = correlation_threshold
         self.pca_variance_ratio = pca_variance_ratio
         self.n_neighbors = n_neighbors
+        
+        self.model_dir = Config.MODEL_DIR
+
         logger.debug(f"KNNPipeline initialized with file paths: {file_paths}, "
                      f"correlation threshold: {correlation_threshold}, "
                      f"PCA variance ratio: {pca_variance_ratio}, "
@@ -46,8 +52,8 @@ class KNNPipeline:
         all_data = data_loader.load_data()
         logger.info(f"Data loaded. Shape: {all_data.shape}")
 
-        X = all_data.drop(columns=['Label'])
-        y = all_data['label']
+        X = all_data.drop(columns=[' Label'])
+        y = all_data[' Label']
         logger.debug("Features (X) and labels (y) extracted from the loaded data.")
 
         preprocessor = PreprocessorBuilder() \
@@ -58,7 +64,8 @@ class KNNPipeline:
             .build()
         logger.debug("Preprocessor built with data cleaning, correlated feature removal, PCA, and label encoding.")
 
-        X_preprocessed, y_encoded = preprocessor.preprocess_data(X, y)
+        X_preprocessed, y_encoded_tuple = preprocessor.preprocess_data(X, y)
+        y_encoded = y_encoded_tuple[0]
         logger.info(f"Data preprocessing completed. Preprocessed features shape: {X_preprocessed.shape}")
 
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = data_loader.split_data(X_preprocessed, y_encoded)
@@ -68,13 +75,20 @@ class KNNPipeline:
                      f"Test: {X_test.shape}, {y_test.shape}")
 
         knn = KNN(n_neighbors=self.n_neighbors)
-        logger.debug("KNN model initialized.")
+        knn.build_model()
+        logger.info("KNN model initialized.")
 
         knn.train(X_train, y_train)
         logger.info("KNN model trained.")
 
-        evaluator = Evaluator(knn)
-        logger.debug("Evaluator created.")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_filename = "knn_model"
+
+        knn.save_model(self.model_dir, timestamp)
+        logger.info("KNN model saved.")
+
+        evaluator = Evaluator(knn.model, self.model_dir, f'{model_filename}_{timestamp}')
+        logger.info("Evaluator created.")
 
         evaluator.evaluate(X_test, y_test)
         logger.info("Model evaluation completed.")
