@@ -20,6 +20,12 @@ def parse_arguments():
         description="Run KNN, BiLSTM-CNN, or Random Forest pipeline."
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="/Users/seansica/OneDrive - Sica/Education/Berkeley/W207-Applied-ML/datasci-207-final-project/datasets/CICIDS2017/MachineLearningCVE",
+        help="Choose the path to your dataset/training files.",
+    )
+    parser.add_argument(
         "--pipeline",
         type=str,
         default="bilstm-cnn",
@@ -143,17 +149,15 @@ def main():
     # Configure the root logger
     configure_logging(pipeline_dir)
 
-    root_path = '/Users/seansica/OneDrive - Sica/Education/Berkeley/W207-Applied-ML/datasci-207-final-project/datasets/CICIDS2017/MachineLearningCVE'
-
     dataset_file_paths = [
-        f"{root_path}/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
-        f"{root_path}/Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv",
-        f"{root_path}/Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv",
-        f"{root_path}/Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv",
-        f"{root_path}/Friday-WorkingHours-Morning.pcap_ISCX.csv",
-        f"{root_path}/Tuesday-WorkingHours.pcap_ISCX.csv",
-        f"{root_path}/Monday-WorkingHours.pcap_ISCX.csv",
-        f"{root_path}/Wednesday-workingHours.pcap_ISCX.csv",
+        f"{args.dataset}/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
+        f"{args.dataset}/Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv",
+        f"{args.dataset}/Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv",
+        f"{args.dataset}/Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv",
+        f"{args.dataset}/Friday-WorkingHours-Morning.pcap_ISCX.csv",
+        f"{args.dataset}/Tuesday-WorkingHours.pcap_ISCX.csv",
+        f"{args.dataset}/Monday-WorkingHours.pcap_ISCX.csv",
+        f"{args.dataset}/Wednesday-workingHours.pcap_ISCX.csv",
     ]
 
     if args.pipeline == 'knn':
