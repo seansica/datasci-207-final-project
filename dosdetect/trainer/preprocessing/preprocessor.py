@@ -5,10 +5,10 @@ from sklearn.decomposition import PCA
 from tensorflow.keras.utils import to_categorical
 import re
 import logging
-from ..utils.logger import setup_logger
+from ..utils.logger import init_logger
 
 
-logger = setup_logger('preprocessor_logger', 'preprocessor.log', level=logging.DEBUG)
+logger = init_logger("preprocessor_logger")
 
 
 class PreprocessorBuilder:
@@ -22,7 +22,7 @@ class PreprocessorBuilder:
         """
         self.steps = []
         logger.debug("PreprocessorBuilder initialized with empty steps.")
-    
+
     def with_label_encoding(self):
         """
         Add label encoding step to the preprocessing pipeline.
@@ -31,9 +31,10 @@ class PreprocessorBuilder:
             PreprocessorBuilder: The builder instance with the label encoding step added.
         """
         self.steps.append(LabelEncoder())
+        self.label_mappings = None  # Initialize label_mappings attribute
         logger.debug("Label encoding step added to PreprocessorBuilder.")
         return self
-    
+
     def with_correlated_feature_removal(self, correlation_threshold=0.9):
         """
         Add correlated feature removal step to the preprocessing pipeline.
@@ -48,7 +49,7 @@ class PreprocessorBuilder:
         self.steps.append(CorrelatedFeatureRemover(correlation_threshold))
         logger.debug(f"Correlated feature removal step added to PreprocessorBuilder with threshold {correlation_threshold}.")
         return self
-    
+
     def with_pca(self, pca_variance_ratio=0.95):
         """
         Add PCA transformation step to the preprocessing pipeline.
@@ -63,7 +64,7 @@ class PreprocessorBuilder:
         self.steps.append(PCATransformer(pca_variance_ratio))
         logger.debug(f"PCA transformation step added to PreprocessorBuilder with variance ratio {pca_variance_ratio}.")
         return self
-    
+
     def with_data_cleaning(self, fill_method='median'):
         """
         Add data cleaning step to the preprocessing pipeline.
@@ -78,7 +79,7 @@ class PreprocessorBuilder:
         self.steps.append(DataCleaner(fill_method))
         logger.debug(f"Data cleaning step added to PreprocessorBuilder with fill method '{fill_method}'.")
         return self
-    
+
     def build(self):
         """
         Build and return the Preprocessor instance with the specified preprocessing steps.
@@ -105,7 +106,7 @@ class Preprocessor:
         """
         self.steps = steps
         logger.debug(f"Preprocessor initialized with {len(steps)} preprocessing steps.")
-    
+
     def preprocess_data(self, X, y=None):
         """
         Preprocess the input data by applying the specified preprocessing steps.
@@ -119,11 +120,13 @@ class Preprocessor:
         """
         logger.info("Starting data preprocessing...")
         X = self.sanitize_column_names(X)
-        
+
+        label_mappings = None  # to be set by encode_labels
+
         for step in self.steps:
             if isinstance(step, LabelEncoder):
                 logger.info("Applying label encoding...")
-                y = self.encode_labels(y, step)
+                y_encoded, label_mappings = self.encode_labels(y, step)
             elif isinstance(step, CorrelatedFeatureRemover):
                 logger.info("Removing correlated features...")
                 X = step.remove_correlated_features(X)
@@ -133,10 +136,10 @@ class Preprocessor:
             elif isinstance(step, DataCleaner):
                 logger.info("Cleaning data...")
                 X = step.clean_data(X)
-        
+
         logger.info("Data preprocessing completed.")
-        return X, y
-    
+        return X, y_encoded, label_mappings
+
     def encode_labels(self, y, label_encoder):
         """
         Encode the target labels using the specified label encoder.
@@ -146,20 +149,17 @@ class Preprocessor:
             label_encoder (LabelEncoder): The label encoder instance.
 
         Returns:
-            numpy.ndarray: The encoded labels in categorical format.
+            numpy.ndarray: The encoded labels.
         """
         logger.debug("Encoding labels...")
         y_encoded = label_encoder.fit_transform(y)
-        
+
         # Print the mapping of original labels to encoded values
         label_mapping = dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_)))
         logger.debug(f"Label Mapping: {label_mapping}")
-        
-        num_classes = len(label_encoder.classes_)
-        y_categorical = to_categorical(y_encoded, num_classes=num_classes)
-        
+
         logger.debug("Label encoding completed.")
-        return y_categorical, label_mapping
+        return y_encoded.ravel(), label_mapping
 
     def sanitize_column_names(self, X):
         """
@@ -172,15 +172,15 @@ class Preprocessor:
             pandas.DataFrame: The input features with sanitized column names.
         """
         logger.debug("Sanitizing column names...")
-        
+
         # Modify column names in place:
         #   - Convert column names to lowercase
         #   - Replace non-alphanumeric characters with underscores
         #   - Strip leading and trailing whitespaces
         X.columns = X.columns.str.strip().str.replace(' ', '_').str.replace('-', '_').str.lower()
-        
+
         logger.debug("Column names sanitized.")
-        
+
         # Return the modified DataFrame
         return X
 

@@ -1,41 +1,43 @@
 import logging
 import os
 
-from ..config import Config
 
-def setup_logger(name, log_file, level=logging.INFO):
+def configure_logging(pipeline_dir):
     """
-    Set up a logger with the specified name, log file, log directory, and logging level.
+    Configure the root logger to write logs to a file in the specified pipeline directory.
+
+    Args:
+        pipeline_dir (str): The directory for the pipeline execution.
+    """
+    path_to_logs = os.path.expanduser(pipeline_dir)
+    os.makedirs(path_to_logs, exist_ok=True)
+    log_file = os.path.join(path_to_logs, "pipeline.log")
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(formatter)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[file_handler, stream_handler],
+    )
+
+
+def init_logger(name, level=logging.DEBUG):
+    """
+    Set up a logger with the specified name and logging level.
 
     Args:
         name (str): The name of the logger.
-        log_file (str): The name of the log file.
-        level (int, optional): The logging level. Defaults to logging.INFO.
+        level (int, optional): The logging level. Defaults to logging.DEBUG.
 
     Returns:
         logging.Logger: The configured logger instance.
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
-
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    # Expand the user's home directory if necessary, safe to use for all paths
-    expanded_log_dir = os.path.expanduser(Config.LOG_DIR)
-    try:
-        os.makedirs(expanded_log_dir, exist_ok=True)
-    except Exception as e:
-        print(f"Error creating directories: {e}")  # Catch and print any error
-
-    log_path = os.path.join(expanded_log_dir, log_file)
-
-    file_handler = logging.FileHandler(log_path)
-    file_handler.setFormatter(formatter)
-
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
-
     return logger

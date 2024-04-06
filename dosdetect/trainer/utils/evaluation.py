@@ -2,13 +2,22 @@ import logging
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, roc_curve, auc, accuracy_score
+from sklearn.metrics import (
+    confusion_matrix,
+    roc_curve,
+    auc,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+)
 import numpy as np
 import os
+import json
 
-from ..utils.logger import setup_logger
+from ..utils.logger import init_logger
 
-logger = setup_logger('evaluator_logger', 'evaluator.log', level=logging.DEBUG)
+logger = init_logger("evaluator_logger")
 
 
 class Evaluator:
@@ -16,90 +25,124 @@ class Evaluator:
     A class for evaluating a trained model.
     """
 
-    def __init__(self, model, output_dir, base_filename):
+    def __init__(self, model, output_dir, base_filename, label_mappings):
         """
         Initialize the Evaluator with a trained model.
 
         Args:
-            model (tensorflow.keras.Model): The trained model to evaluate.
+            model (tensorflow.keras.Model or sklearn.base.BaseEstimator): The trained model to evaluate.
             output_dir (str): Directory to save evaluation results.
-            base_filename (str): Base filename for saving evaluation plots.
+            base_filename (str): Base filename for saving evaluation plots and metrics.
+            label_mappings (dict): The mappings of encoded labels to original labels.
         """
         self.model = model
+        self.label_mappings = label_mappings
         self.output_dir = output_dir
         self.base_filename = base_filename
+
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
+
         logger.debug("Evaluator initialized with the trained model.")
-    
+
     def evaluate(self, X_test, y_test):
         """
-        Evaluate the model on the test set. Automatically detects if the model
-        is a Keras model or a scikit-learn model and applies the appropriate 
-        evaluation method.
+        Evaluate the model on the test set.
 
         Args:
             X_test (numpy.ndarray): Test input features.
             y_test (numpy.ndarray): Test target labels.
 
         Returns:
-            If Keras model: Returns the loss and accuracy.
-            If scikit-learn model: Returns the accuracy.
+            dict: A dictionary containing the evaluation metrics.
         """
         logger.debug(f"Evaluating model of type: {type(self.model)}")
 
         if isinstance(self.model, tf.keras.models.Model):
-            # Keras model evaluation
-            loss, accuracy = self.model.evaluate(X_test, y_test, verbose=0)
-            logger.info(f"Keras Model - Test Loss: {loss:.4f}, Test Accuracy: {accuracy:.4f}")
-            metrics = {'loss': loss, 'accuracy': accuracy}
+            metrics = self._evaluate_keras_model(X_test, y_test)
         else:
-            # Scikit-learn model evaluation
-            y_pred = self.model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            logger.info(f"Scikit-learn Model - Test Accuracy: {accuracy:.4f}")
-            metrics = {'accuracy': accuracy}
-        
-        self.plot_confusion_matrix(y_test, y_pred, title='Confusion Matrix')
-        
-        if hasattr(self.model, 'predict_proba') and len(np.unique(y_test)) == 2:
-            # Only plot ROC curve for binary classification problems with probability output
-            y_prob = self.model.predict_proba(X_test)[:, 1]
-            self.plot_roc_curve(y_test, y_prob, title='ROC Curve')
-        
+            metrics = self._evaluate_sklearn_model(X_test, y_test)
+
+        self._save_evaluation_metrics(metrics)
         return metrics
 
-    def plot_confusion_matrix(self, y_true, y_pred, title):
+    def _evaluate_keras_model(self, X_test, y_test):
         """
-        Plot the confusion matrix and save it to a file.
+        Evaluate a Keras model.
         """
-        matrix = confusion_matrix(y_true, y_pred)
-        plt.figure(figsize=(10, 7))
-        sns.heatmap(matrix, annot=True, fmt="d", cmap="Blues")
-        plt.title(title)
-        plt.ylabel('Actual label')
-        plt.xlabel('Predicted label')
-        plt.tight_layout()
-        filename = f"{self.base_filename}_confusion_matrix.png"
-        plt.savefig(os.path.join(self.output_dir, filename))
-        plt.close()
+        y_pred_prob = self.model.predict(X_test)
+        y_pred = np.argmax(y_pred_prob, axis=1)
+        return self._compute_metrics(y_test, y_pred, y_pred_prob)
 
-    def plot_roc_curve(self, y_true, y_prob, title):
+    def _evaluate_sklearn_model(self, X_test, y_test):
         """
-        Plot the ROC curve and save it to a file.
+        Evaluate a scikit-learn model.
         """
-        fpr, tpr, thresholds = roc_curve(y_true, y_prob)
+        y_pred = self.model.predict(X_test)
+        y_pred_prob = self.model.predict_proba(X_test)
+        return self._compute_metrics(y_test, y_pred, y_pred_prob)
+
+    def _compute_metrics(self, y_true, y_pred, y_prob):
+        """
+        Compute evaluation metrics for each class label.
+        """
+        metrics = {}
+        for encoded_label, label_name in self.label_mappings.items():
+            logger.info(f"Computing metrics for class: {label_name}")
+            metrics[label_name] = {
+                "accuracy": accuracy_score(y_true == encoded_label, y_pred == encoded_label),
+                "precision": precision_score(y_true == encoded_label, y_pred == encoded_label),
+                "recall": recall_score(y_true == encoded_label, y_pred == encoded_label),
+                "f1_score": f1_score(y_true == encoded_label, y_pred == encoded_label),
+            }
+            self._plot_roc_curve(y_true == encoded_label, y_prob[:, encoded_label], label_name)
+            self._plot_confusion_matrix(y_true == encoded_label, y_pred == encoded_label, label_name)
+
+        return metrics
+
+    def _plot_roc_curve(self, y_true, y_prob, label_name):
+        """
+        Plot the ROC curve for a specific class label and save it to a file.
+        """
+        fpr, tpr, _ = roc_curve(y_true, y_prob)
         roc_auc = auc(fpr, tpr)
 
         plt.figure()
-        plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+        plt.plot(
+            fpr, tpr, color="darkorange", lw=2, label=f"ROC curve (AUC = {roc_auc:.2f})"
+        )
         plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
         plt.xlim([0.0, 1.0])
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title(title)
+        plt.title(f"ROC Curve - {label_name}")
         plt.legend(loc="lower right")
-        filename = f"{self.base_filename}_roc_curve.png"
+
+        filename = f"{self.base_filename}_{label_name}_roc_curve.png"
         plt.savefig(os.path.join(self.output_dir, filename))
         plt.close()
+
+    def _plot_confusion_matrix(self, y_true, y_pred, label_name):
+        """
+        Plot the confusion matrix for a specific class label and save it to a file.
+        """
+        matrix = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(matrix, annot=True, fmt="d", cmap="Blues")
+        plt.title(f"Confusion Matrix - {label_name}")
+        plt.ylabel("Actual label")
+        plt.xlabel("Predicted label")
+        plt.tight_layout()
+
+        filename = f"{self.base_filename}_{label_name}_confusion_matrix.png"
+        plt.savefig(os.path.join(self.output_dir, filename))
+        plt.close()
+
+    def _save_evaluation_metrics(self, metrics):
+        """
+        Save the evaluation metrics to a JSON file.
+        """
+        filename = f"{self.base_filename}_evaluation_metrics.json"
+        with open(os.path.join(self.output_dir, filename), "w") as file:
+            json.dump(metrics, file, indent=4)

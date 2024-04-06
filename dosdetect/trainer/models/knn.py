@@ -6,10 +6,9 @@ import os
 import joblib
 from sklearn.neighbors import KNeighborsClassifier
 
-from ..config import Config
-from ..utils.logger import setup_logger
+from ..utils.logger import init_logger
 
-logger = setup_logger('knn_logger', 'knn.log', level=logging.DEBUG)
+logger = init_logger("knn_logger")
 
 
 class KNN:
@@ -63,27 +62,24 @@ class KNN:
         logger.info("Predictions completed.")
         return predictions
 
-    def save_model(self, model_dir, timestamp=datetime.now().strftime("%Y%m%d%H%M%S"), model_filename="knn_model"):
+    def save_model(self, output_dir):
         """
         Save the trained KNN model to a file.
 
         Args:
-            model_dir (str): Directory to save the model file.
+            output_dir (str): Directory to save the model file.
         """
         # Ensure the target directory exists
-        expanded_model_dir = os.path.expanduser(model_dir)
+        expanded_output_dir = os.path.expanduser(output_dir)
         try:
-            os.makedirs(expanded_model_dir, exist_ok=True)
+            os.makedirs(expanded_output_dir, exist_ok=True)
         except Exception as e:
             logger.error(f"Error creating directories: {e}")
 
-        model_filename_with_timestamp = f"{model_filename}_{timestamp}"  # Base filename with timestamp
-        model_path = os.path.join(expanded_model_dir, f"{model_filename_with_timestamp}.pkl")
+        model_path = os.path.join(expanded_output_dir, "model.pkl")
         joblib.dump(self.model, model_path)
 
-        # Correctly create companion filename without duplicating timestamp
-        companion_filename = f"{model_filename_with_timestamp}.json"
-        companion_path = os.path.join(expanded_model_dir, companion_filename)
+        companion_path = os.path.join(expanded_output_dir, "hyperparameters.json")
         model_config = {
             "n_neighbors": self.n_neighbors
         }
@@ -92,8 +88,7 @@ class KNN:
 
         logger.info(f"KNN model saved to {model_path}")
         logger.info(f"Model configuration saved to {companion_path}")
-        return model_filename_with_timestamp  # Return the base filename with timestamp
-
+        return
 
     def load_model(self, model_path):
         """

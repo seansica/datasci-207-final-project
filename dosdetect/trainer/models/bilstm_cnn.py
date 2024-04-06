@@ -5,9 +5,9 @@ import logging
 import tensorflow as tf
 from tensorflow.keras.layers import Bidirectional, LSTM, Conv1D, Dense, Dropout
 
-from ..utils.logger import setup_logger
+from ..utils.logger import init_logger
 
-logger = setup_logger('bilstm_cnn_logger', 'bilstm_cnn.log', level=logging.DEBUG)
+logger = init_logger("bilstm_cnn_logger")
 
 
 class BiLSTMCNN:
@@ -105,24 +105,27 @@ class BiLSTMCNN:
 
         return loss, accuracy
 
-    def save_model(self, model_dir):
+    def save_model(self, output_dir):
         """
         Save the trained BiLSTM-CNN model to a file.
 
         Args:
-            model_dir (str): Directory to save the model file.
+            output_dir (str): Directory to save the model file.
         """
         # Ensure the target directory exists
-        os.makedirs(model_dir, exist_ok=True)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_filename = f"bilstm_cnn_model_{timestamp}.h5"
-        model_path = os.path.join(model_dir, model_filename)
+        expanded_output_dir = os.path.expanduser(output_dir)
+        try:
+            os.makedirs(expanded_output_dir, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Error creating directories: {e}")
+
+        model_filename = f"model.keras"
+        model_path = os.path.join(output_dir, model_filename)
         self.model.save(model_path)
 
         # Create a companion file with model configuration details
-        companion_filename = f"bilstm_cnn_model_{timestamp}.json"
-        companion_path = os.path.join(model_dir, companion_filename)
+        companion_filename = f"hyperparameters.json"
+        companion_path = os.path.join(output_dir, companion_filename)
         model_config = {
             "input_shape": self.input_shape,
             "num_classes": self.num_classes,
