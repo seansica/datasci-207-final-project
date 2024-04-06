@@ -32,7 +32,7 @@ class KNN:
         Build the KNN model.
         """
         logger.info("Building KNN model...")
-        self.model = KNeighborsClassifier(n_neighbors=self.n_neighbors)
+        self.model = KNeighborsClassifier(n_neighbors=self.n_neighbors, verbose=1)
         logger.info("KNN model built.")
 
     def train(self, X_train, y_train):

@@ -63,10 +63,8 @@ class BasePipeline:
 
         return data_loader, X_preprocessed, y_encoded, label_mappings
 
-    def evaluate_model(
-        self, model, pipeline_dir, model_name, X_test, y_test, label_mappings
-    ):
-        evaluator = Evaluator(model, pipeline_dir, model_name, label_mappings)
+    def evaluate_model(self, model, pipeline_dir, X_test, y_test, label_mappings):
+        evaluator = Evaluator(model, pipeline_dir, label_mappings)
         logger.debug("Evaluator created.")
 
         evaluator.evaluate(X_test, y_test)

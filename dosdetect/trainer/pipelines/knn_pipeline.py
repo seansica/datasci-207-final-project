@@ -41,7 +41,7 @@ class KNNPipeline(BasePipeline):
         data_loader, X_preprocessed, y_encoded, label_mappings = self.preprocess_data()
 
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = data_loader.split_data(X_preprocessed, y_encoded)
-        
+
         logger.debug(f"Data split into train, validation, and test sets. "
                      f"Train: {X_train.shape}, {y_train.shape}, "
                      f"Validation: {X_val.shape}, {y_val.shape}, "
@@ -58,7 +58,7 @@ class KNNPipeline(BasePipeline):
         logger.info("KNN model saved.")
 
         self.evaluate_model(
-            knn.model, self.pipeline_dir, "knn_model", X_test, y_test, label_mappings
+            knn.model, self.pipeline_dir, X_test, y_test, label_mappings
         )
 
         logger.info("KNN pipeline finished.")

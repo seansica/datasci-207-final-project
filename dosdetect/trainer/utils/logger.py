@@ -1,10 +1,31 @@
-import logging
+import sys
 import os
+import logging
+from contextlib import redirect_stdout
+
+
+class StreamToLogger(object):
+    """
+    Fake file-like stream object that redirects writes to a logger instance.
+    """
+
+    def __init__(self, logger, log_level=logging.INFO):
+        self.logger = logger
+        self.log_level = log_level
+        self.linebuf = ""
+
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.log_level, line.rstrip())
+
+    def flush(self):
+        pass
 
 
 def configure_logging(pipeline_dir):
     """
-    Configure the root logger to write logs to a file in the specified pipeline directory.
+    Configure the root logger to write logs to a file in the specified pipeline directory
+    and redirect stdout to the logger.
 
     Args:
         pipeline_dir (str): The directory for the pipeline execution.
@@ -13,18 +34,19 @@ def configure_logging(pipeline_dir):
     os.makedirs(path_to_logs, exist_ok=True)
     log_file = os.path.join(path_to_logs, "pipeline.log")
 
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(formatter)
-
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-
     logging.basicConfig(
         level=logging.DEBUG,
-        handlers=[file_handler, stream_handler],
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
     )
+
+    stdout_logger = logging.getLogger("STDOUT")
+    sl = StreamToLogger(stdout_logger, logging.INFO)
+    sys.stdout = sl
+
+    stderr_logger = logging.getLogger("STDERR")
+    sl = StreamToLogger(stderr_logger, logging.ERROR)
+    sys.stderr = sl
 
 
 def init_logger(name, level=logging.DEBUG):

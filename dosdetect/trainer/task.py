@@ -6,6 +6,7 @@ from .utils.logger import configure_logging
 
 from .pipelines.bilstm_cnn_pipeline import BiLSTMCNNPipeline
 from .pipelines.knn_pipeline import KNNPipeline
+from .pipelines.random_forest_pipeline import RandomForestPipeline
 
 
 def parse_arguments():
@@ -15,9 +16,16 @@ def parse_arguments():
     Returns:
         argparse.Namespace: Parsed command line arguments.
     """
-    parser = argparse.ArgumentParser(description='Run KNN or BiLSTM-CNN pipeline.')
-    parser.add_argument('--pipeline', type=str, default='bilstm-cnn', choices=['knn', 'bilstm-cnn'],
-                        help='Choose the pipeline to run: "knn" or "bilstm-cnn" (default: "bilstm-cnn")')
+    parser = argparse.ArgumentParser(
+        description="Run KNN, BiLSTM-CNN, or Random Forest pipeline."
+    )
+    parser.add_argument(
+        "--pipeline",
+        type=str,
+        default="bilstm-cnn",
+        choices=["knn", "bilstm-cnn", "random-forest"],
+        help='Choose the pipeline to run: "knn", "bilstm-cnn", or "random-forest" (default: "bilstm-cnn")',
+    )
     parser.add_argument(
         "--log-dir",
         type=str,
@@ -77,6 +85,38 @@ def parse_arguments():
         help="Batch size for BiLSTM-CNN pipeline (default: 32)",
     )
 
+    # Random Forest pipeline hyperparameters
+    parser.add_argument(
+        "--random-forest-correlation-threshold",
+        type=float,
+        default=0.9,
+        help="Correlation threshold for Random Forest pipeline (default: 0.9)",
+    )
+    parser.add_argument(
+        "--random-forest-pca-variance-ratio",
+        type=float,
+        default=0.95,
+        help="PCA variance ratio for Random Forest pipeline (default: 0.95)",
+    )
+    parser.add_argument(
+        "--random-forest-n-estimators",
+        type=int,
+        default=100,
+        help="Number of estimators for Random Forest pipeline (default: 100)",
+    )
+    parser.add_argument(
+        "--random-forest-max-depth",
+        type=int,
+        default=None,
+        help="Maximum depth for Random Forest pipeline (default: None)",
+    )
+    parser.add_argument(
+        "--random-forest-random-state",
+        type=int,
+        default=None,
+        help="Random state for Random Forest pipeline (default: None)",
+    )
+
     args = parser.parse_args()
 
     return args
@@ -91,8 +131,12 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if args.pipeline == "knn":
         pipeline_dir = os.path.join(args.model_dir, f"knn_pipeline_{timestamp}")
-    else:
+    elif args.pipeline == "bilstm-cnn":
         pipeline_dir = os.path.join(args.model_dir, f"bilstm_cnn_pipeline_{timestamp}")
+    else:
+        pipeline_dir = os.path.join(
+            args.model_dir, f"random_forest_pipeline_{timestamp}"
+        )
 
     os.makedirs(pipeline_dir, exist_ok=True)
 
@@ -121,8 +165,21 @@ def main():
             args.knn_pca_variance_ratio,
             args.knn_n_neighbors,
         )
-    else:
-        pipeline_dir = os.path.join(args.model_dir, f"knn_pipeline_{timestamp}")
+    elif args.pipeline == "random-forest":
+        pipeline_dir = os.path.join(
+            args.model_dir, f"random_forest_pipeline_{timestamp}"
+        )
+        pipeline = RandomForestPipeline(
+            dataset_file_paths,
+            pipeline_dir,
+            args.random_forest_correlation_threshold,
+            args.random_forest_pca_variance_ratio,
+            args.random_forest_n_estimators,
+            args.random_forest_max_depth,
+            args.random_forest_random_state,
+        )
+    elif args.pipeline == "bilstm-cnn":
+        pipeline_dir = os.path.join(args.model_dir, f"bilstm_cnn_pipeline_{timestamp}")
         pipeline = BiLSTMCNNPipeline(
             dataset_file_paths,
             pipeline_dir,
@@ -130,6 +187,11 @@ def main():
             args.bilstm_cnn_pca_variance_ratio,
             args.bilstm_cnn_epochs,
             args.bilstm_cnn_batch_size,
+        )
+        return pipeline
+    else:
+        raise NotImplementedError(
+            "Not a valid pipeline. Run --help for a list of available pipelines."
         )
 
     pipeline.run()

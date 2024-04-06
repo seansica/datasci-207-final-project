@@ -25,20 +25,18 @@ class Evaluator:
     A class for evaluating a trained model.
     """
 
-    def __init__(self, model, output_dir, base_filename, label_mappings):
+    def __init__(self, model, output_dir, label_mappings):
         """
         Initialize the Evaluator with a trained model.
 
         Args:
             model (tensorflow.keras.Model or sklearn.base.BaseEstimator): The trained model to evaluate.
             output_dir (str): Directory to save evaluation results.
-            base_filename (str): Base filename for saving evaluation plots and metrics.
             label_mappings (dict): The mappings of encoded labels to original labels.
         """
         self.model = model
         self.label_mappings = label_mappings
-        self.output_dir = output_dir
-        self.base_filename = base_filename
+        self.output_dir = os.path.expanduser(output_dir)
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -87,7 +85,7 @@ class Evaluator:
         Compute evaluation metrics for each class label.
         """
         metrics = {}
-        for encoded_label, label_name in self.label_mappings.items():
+        for label_name, encoded_label in self.label_mappings.items():
             logger.info(f"Computing metrics for class: {label_name}")
             metrics[label_name] = {
                 "accuracy": accuracy_score(y_true == encoded_label, y_pred == encoded_label),
@@ -97,6 +95,9 @@ class Evaluator:
             }
             self._plot_roc_curve(y_true == encoded_label, y_prob[:, encoded_label], label_name)
             self._plot_confusion_matrix(y_true == encoded_label, y_pred == encoded_label, label_name)
+
+        self._plot_overall_confusion_matrix(y_true, y_pred)
+        self._plot_overall_roc_curve(y_true, y_pred)
 
         return metrics
 
@@ -119,8 +120,9 @@ class Evaluator:
         plt.title(f"ROC Curve - {label_name}")
         plt.legend(loc="lower right")
 
-        filename = f"{self.base_filename}_{label_name}_roc_curve.png"
-        plt.savefig(os.path.join(self.output_dir, filename))
+        roc_curve_dir = os.path.join(self.output_dir, "roc_curve")
+        os.makedirs(roc_curve_dir, exist_ok=True)
+        plt.savefig(os.path.join(roc_curve_dir, f"roc_curve_{label_name}.png"))
         plt.close()
 
     def _plot_confusion_matrix(self, y_true, y_pred, label_name):
@@ -135,14 +137,74 @@ class Evaluator:
         plt.xlabel("Predicted label")
         plt.tight_layout()
 
-        filename = f"{self.base_filename}_{label_name}_confusion_matrix.png"
-        plt.savefig(os.path.join(self.output_dir, filename))
+        confusion_matrix_dir = os.path.join(self.output_dir, "confusion_matrix")
+        os.makedirs(confusion_matrix_dir, exist_ok=True)
+        plt.savefig(
+            os.path.join(confusion_matrix_dir, f"confusion_matrix_{label_name}.png")
+        )
+        plt.close()
+
+    def _plot_overall_confusion_matrix(self, y_true, y_pred):
+        """
+        Plot the overall confusion matrix including all classes and save it to a file.
+        """
+        matrix = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(12, 10))
+        sns.heatmap(
+            matrix,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=self.label_mappings.keys(),
+            yticklabels=self.label_mappings.keys(),
+        )
+        plt.title("Overall Confusion Matrix")
+        plt.ylabel("Actual label")
+        plt.xlabel("Predicted label")
+        plt.tight_layout()
+
+        plt.savefig(os.path.join(self.output_dir, "overall_confusion_matrix.png"))
+        plt.close()
+
+    def _plot_overall_roc_curve(self, y_true, y_prob):
+        """
+        Plot the overall ROC curve including all classes and save it to a file.
+        """
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+        for label_name, encoded_label in self.label_mappings.items():
+            # Convert y_true and y_prob to binary arrays for the current class
+            y_true_binary = (y_true == encoded_label).astype(int)
+            y_prob_binary = (y_prob == encoded_label).astype(int)
+
+            fpr[label_name], tpr[label_name], _ = roc_curve(
+                y_true_binary, y_prob_binary
+            )
+            roc_auc[label_name] = auc(fpr[label_name], tpr[label_name])
+
+        plt.figure(figsize=(10, 8))
+        for label_name in self.label_mappings.keys():
+            plt.plot(
+                fpr[label_name],
+                tpr[label_name],
+                lw=2,
+                label=f"{label_name} (AUC = {roc_auc[label_name]:.2f})",
+            )
+        plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.title("Overall ROC Curve")
+        plt.legend(loc="lower right")
+
+        plt.savefig(os.path.join(self.output_dir, "overall_roc_curve.png"))
         plt.close()
 
     def _save_evaluation_metrics(self, metrics):
         """
         Save the evaluation metrics to a JSON file.
         """
-        filename = f"{self.base_filename}_evaluation_metrics.json"
-        with open(os.path.join(self.output_dir, filename), "w") as file:
+        with open(os.path.join(self.output_dir, "eval_metrics.json"), "w") as file:
             json.dump(metrics, file, indent=4)
