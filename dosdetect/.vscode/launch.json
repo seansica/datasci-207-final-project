@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "name": "Python: Module",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "trainer.task",
+            "args": [
+                "--pipeline",
+                "knn"
+            ]
+        }
+    ]
+}
