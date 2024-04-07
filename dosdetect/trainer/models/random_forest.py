@@ -5,6 +5,7 @@ import json
 import os
 import joblib
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
 
 from ..utils.logger import init_logger
 
@@ -16,7 +17,9 @@ class RandomForest:
     A class for creating and managing a Random Forest model.
     """
 
-    def __init__(self, n_estimators=100, max_depth=None, random_state=None):
+    def __init__(
+        self, n_estimators=100, max_depth=None, random_state=None, auto_tune=False
+    ):
         """
         Initialize the Random Forest model with the specified hyperparameters.
 
@@ -24,13 +27,15 @@ class RandomForest:
             n_estimators (int): Number of trees in the forest. Defaults to 100.
             max_depth (int): Maximum depth of the tree. Defaults to None (no limit).
             random_state (int): Seed for the random number generator. Defaults to None.
+            auto_tune (bool): Whether to use GridSearchCV for hyperparameter tuning. Defaults to False.
         """
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.random_state = random_state
+        self.auto_tune = auto_tune
         self.model = None
         logger.debug(
-            f"RandomForest initialized with n_estimators={n_estimators}, max_depth={max_depth}, random_state={random_state}"
+            f"RandomForest initialized with n_estimators={n_estimators}, max_depth={max_depth}, random_state={random_state}, auto_tune={auto_tune}"
         )
 
     def build_model(self):
@@ -55,7 +60,26 @@ class RandomForest:
             y_train (numpy.ndarray): Training target labels.
         """
         logger.info("Training Random Forest model...")
-        self.model.fit(X_train, y_train)
+
+        if self.auto_tune:
+            # Define the hyperparameter grid for tuning
+            param_grid = {
+                "n_estimators": [50, 100, 200],
+                "max_depth": [None, 10, 20, 30],
+                "min_samples_split": [2, 5, 10],
+                "min_samples_leaf": [1, 2, 4],
+            }
+
+            # Perform grid search with cross-validation
+            grid_search = GridSearchCV(self.model, param_grid, cv=5, scoring="accuracy")
+            grid_search.fit(X_train, y_train)
+
+            # Set the best hyperparameters found by grid search
+            self.model = grid_search.best_estimator_
+            logger.info(f"Best hyperparameters: {grid_search.best_params_}")
+        else:
+            self.model.fit(X_train, y_train)
+
         logger.info("Random Forest model training completed.")
 
     def predict(self, X):
@@ -95,6 +119,7 @@ class RandomForest:
             "n_estimators": self.n_estimators,
             "max_depth": self.max_depth,
             "random_state": self.random_state,
+            "auto_tune": self.auto_tune,
         }
         with open(companion_path, "w") as file:
             json.dump(model_config, file, indent=4)

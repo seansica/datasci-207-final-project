@@ -2,6 +2,8 @@
 import json
 import os
 
+from ..utils.evaluation import SKLearnEvaluator
+
 from .base_pipeline import BasePipeline
 from ..models.random_forest import RandomForest
 from ..utils.logger import init_logger
@@ -10,18 +12,26 @@ logger = init_logger("random_forest_pipeline_logger")
 
 
 class RandomForestPipeline(BasePipeline):
+
     def __init__(
         self,
         dataset_file_paths,
         pipeline_dir,
-        correlation_threshold,
-        pca_variance_ratio,
-        n_estimators,
-        max_depth,
-        random_state,
+        auto_tune=True,
+        train_fraction=1.0,
+        correlation_threshold=None,
+        pca_variance_ratio=None,
+        n_estimators=100,
+        max_depth=None,
+        random_state=None,
     ):
         super().__init__(
-            dataset_file_paths, pipeline_dir, correlation_threshold, pca_variance_ratio
+            dataset_file_paths,
+            pipeline_dir,
+            auto_tune,
+            train_fraction,
+            correlation_threshold,
+            pca_variance_ratio,
         )
         self.n_estimators = n_estimators
         self.max_depth = max_depth
@@ -32,6 +42,8 @@ class RandomForestPipeline(BasePipeline):
 
         pipeline_details = {
             "pipeline_type": "RandomForest",
+            "auto_tune": self.auto_tune,
+            "train_fraction": self.train_fraction,
             "correlation_threshold": self.correlation_threshold,
             "pca_variance_ratio": self.pca_variance_ratio,
             "n_estimators": self.n_estimators,
@@ -59,6 +71,7 @@ class RandomForestPipeline(BasePipeline):
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
             random_state=self.random_state,
+            auto_tune=self.auto_tune,
         )
         random_forest.build_model()
         logger.info("Random Forest model initialized.")
@@ -69,8 +82,9 @@ class RandomForestPipeline(BasePipeline):
         random_forest.save_model(self.pipeline_dir)
         logger.info("Random Forest model saved.")
 
-        self.evaluate_model(
-            random_forest.model, self.pipeline_dir, X_test, y_test, label_mappings
+        evaluator = SKLearnEvaluator(
+            random_forest.model, self.pipeline_dir, label_mappings
         )
+        evaluator.evaluate(X_test, y_test)
 
         logger.info("Random Forest pipeline finished.")

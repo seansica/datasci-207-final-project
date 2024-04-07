@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 from sklearn.decomposition import PCA
 from tensorflow.keras.utils import to_categorical
 import re
@@ -22,6 +22,17 @@ class PreprocessorBuilder:
         """
         self.steps = []
         logger.debug("PreprocessorBuilder initialized with empty steps.")
+
+    def with_one_hot_encoding(self):
+        """
+        Add one-hot encoding step to the preprocessing pipeline.
+
+        Returns:
+            PreprocessorBuilder: The builder instance with the one-hot encoding step added.
+        """
+        self.steps.append(OneHotEncoder())
+        logger.debug("One-hot encoding step added to PreprocessorBuilder.")
+        return self
 
     def with_label_encoding(self):
         """
@@ -107,13 +118,14 @@ class Preprocessor:
         self.steps = steps
         logger.debug(f"Preprocessor initialized with {len(steps)} preprocessing steps.")
 
-    def preprocess_data(self, X, y=None):
+    def preprocess_data(self, X, y=None, num_classes=None):
         """
         Preprocess the input data by applying the specified preprocessing steps.
 
         Args:
             X (pandas.DataFrame): The input features.
             y (pandas.Series, optional): The target labels. Defaults to None.
+            num_classes (int, optional): The number of unique classes. Required for one-hot encoding.
 
         Returns:
             tuple: A tuple containing the preprocessed features (X) and labels (y).
@@ -127,6 +139,9 @@ class Preprocessor:
             if isinstance(step, LabelEncoder):
                 logger.info("Applying label encoding...")
                 y_encoded, label_mappings = self.encode_labels(y, step)
+            elif isinstance(step, OneHotEncoder):
+                logger.info("Applying one-hot encoding...")
+                y_encoded = step.encode_labels(y_encoded, num_classes)
             elif isinstance(step, CorrelatedFeatureRemover):
                 logger.info("Removing correlated features...")
                 X = step.remove_correlated_features(X)
@@ -284,7 +299,7 @@ class DataCleaner:
         """
         self.fill_method = fill_method
         logger.debug(f"DataCleaner initialized with fill method '{fill_method}'.")
-    
+
     def clean_data(self, data):
         """
         Clean the dataset by handling infinite and NaN values.
@@ -322,3 +337,31 @@ class DataCleaner:
 
         logger.debug("Data cleaning completed.")
         return data
+
+
+class OneHotEncoder:
+    """
+    Class for one-hot encoding the target labels.
+    """
+
+    def __init__(self):
+        """
+        Initialize the OneHotEncoder.
+        """
+        logger.debug("OneHotEncoder initialized.")
+
+    def encode_labels(self, y, num_classes):
+        """
+        One-hot encode the target labels.
+
+        Args:
+            y (numpy.ndarray): The target labels.
+            num_classes (int): The number of unique classes.
+
+        Returns:
+            numpy.ndarray: The one-hot encoded labels.
+        """
+        logger.debug("One-hot encoding labels...")
+        y_one_hot = to_categorical(y, num_classes=num_classes)
+        logger.debug("One-hot encoding completed.")
+        return y_one_hot
