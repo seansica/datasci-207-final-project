@@ -1,9 +1,10 @@
+tensorflow>=2.3
+keras-tuner
+scikit-learn
 numpy
 pandas
 matplotlib
-tensorflow>=2.3
 seaborn
-scikit-learn
 tabulate
 setuptools 
 wheel 
