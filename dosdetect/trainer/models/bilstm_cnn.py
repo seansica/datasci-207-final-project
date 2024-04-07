@@ -135,41 +135,23 @@ class BiLSTMCNN:
 
         Args:
             X_train (numpy.ndarray): Training input features.
-            y_train (numpy.ndarray): Training target labels.
+            y_train (numpy.ndarray): Training target labels (already one-hot encoded).
             epochs (int): Number of training epochs.
             batch_size (int): Batch size for training.
             validation_data (tuple): Tuple of (X_val, y_val) for validation during training.
+                                    y_val should be already one-hot encoded.
+
+        Returns:
+            tf.keras.callbacks.History: The history object containing training details.
         """
         logger.info(f"Training BiLSTM-CNN model for {epochs} epochs...")
 
         # Create early stopping callback
-        early_stopping = EarlyStopping(
+        early_stopping = tf.keras.callbacks.EarlyStopping(
             monitor="val_loss", patience=5, restore_best_weights=True
         )
 
-        if self.auto_tune:
-            # Perform hyperparameter tuning
-            tuner = RandomSearch(
-                self.build_model,
-                objective="val_accuracy",
-                max_trials=10,
-                executions_per_trial=3,
-                directory="bilstm_cnn_tuning",
-                project_name="bilstm_cnn_tuning",
-            )
-            tuner.search(
-                X_train,
-                y_train,
-                epochs=epochs,
-                batch_size=batch_size,
-                validation_data=validation_data,
-                callbacks=[early_stopping],
-            )
-            best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
-            self.model = self.build_model(best_hps)
-            self.compile_model()
-
-        self.model.fit(
+        history = self.model.fit(
             X_train,
             y_train,
             epochs=epochs,
@@ -179,6 +161,7 @@ class BiLSTMCNN:
         )
 
         logger.info("BiLSTM-CNN model training completed.")
+        return history
 
     def save_model(self, output_dir):
         """

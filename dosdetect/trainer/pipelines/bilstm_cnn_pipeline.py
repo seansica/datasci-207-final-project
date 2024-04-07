@@ -1,23 +1,24 @@
-# pipelines/bilstm_cnn_pipeline.py
 from datetime import datetime
 import json
 import os
 import logging
+import tensorflow as tf
 
 from .base_pipeline import BasePipeline
 from ..models.bilstm_cnn import BiLSTMCNN
+from ..utils.evaluation import KerasEvaluator, SKLearnEvaluator
 from ..utils.logger import init_logger
 
 logger = init_logger("bilstm_cnn_pipeline_logger")
 
 
 class BiLSTMCNNPipeline(BasePipeline):
-
     def __init__(
         self,
         dataset_file_paths,
         pipeline_dir,
         auto_tune=True,
+        train_fraction=1.0,
         correlation_threshold=None,
         pca_variance_ratio=None,
         epochs=None,
@@ -27,6 +28,7 @@ class BiLSTMCNNPipeline(BasePipeline):
             dataset_file_paths,
             pipeline_dir,
             auto_tune,
+            train_fraction,
             correlation_threshold,
             pca_variance_ratio,
         )
@@ -39,6 +41,7 @@ class BiLSTMCNNPipeline(BasePipeline):
         pipeline_details = {
             "pipeline_type": "BiLSTM-CNN",
             "auto_tune": self.auto_tune,
+            "train_fraction": self.train_fraction,
             "correlation_threshold": self.correlation_threshold,
             "pca_variance_ratio": self.pca_variance_ratio,
             "epochs": self.epochs,
@@ -50,7 +53,7 @@ class BiLSTMCNNPipeline(BasePipeline):
 
         data_loader, X_preprocessed, y_encoded, label_mappings = self.preprocess_data()
 
-        num_classes = y_encoded.shape[1]
+        num_classes = len(label_mappings)
         logger.debug(f"Number of classes: {num_classes}")
 
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = data_loader.split_data(X_preprocessed, y_encoded)
@@ -68,7 +71,7 @@ class BiLSTMCNNPipeline(BasePipeline):
         logger.debug("Model compiled with Adam optimizer, categorical cross-entropy loss, and accuracy metric.")
 
         logger.info(f"Training the model for {self.epochs} epochs...")
-        bilstm_cnn.train_model(
+        history = bilstm_cnn.train_model(
             X_train,
             y_train,
             epochs=self.epochs,
@@ -77,22 +80,10 @@ class BiLSTMCNNPipeline(BasePipeline):
         )
         logger.info("Model training completed.")
 
-        # test_loss, test_accuracy = bilstm_cnn.evaluate_model(X_test, y_test)
-        # logger.info(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
-
         bilstm_cnn.save_model(self.pipeline_dir)
         logger.info("Model saved.")
 
-        self.evaluate_model(
-            bilstm_cnn.model,
-            self.pipeline_dir,
-            X_train,
-            y_train,
-            X_val,
-            y_val,
-            X_test,
-            y_test,
-            label_mappings,
-        )
+        evaluator = KerasEvaluator(bilstm_cnn.model, self.pipeline_dir, label_mappings)
+        evaluator.evaluate(X_test, y_test, history)
 
         logger.info("BiLSTM-CNN pipeline finished.")
