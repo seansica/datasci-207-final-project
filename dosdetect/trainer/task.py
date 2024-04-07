@@ -31,6 +31,12 @@ def parse_arguments():
         help="Choose the path to your dataset/training files.",
     )
     parser.add_argument(
+        "--train-fraction",
+        type=float,
+        default=1.0,
+        help="Train the model on a fraction of the training dataset to speed up training.",
+    )
+    parser.add_argument(
         "--pipeline",
         type=str,
         default="bilstm-cnn",
@@ -171,6 +177,7 @@ def main():
             dataset_file_paths,
             pipeline_dir,
             args.auto_tune,
+            args.train_fraction,
             args.knn_correlation_threshold,
             args.knn_pca_variance_ratio,
             args.knn_n_neighbors,
@@ -194,12 +201,12 @@ def main():
             dataset_file_paths,
             pipeline_dir,
             args.auto_tune,
+            args.train_fraction,
             args.bilstm_cnn_correlation_threshold,
             args.bilstm_cnn_pca_variance_ratio,
             args.bilstm_cnn_epochs,
             args.bilstm_cnn_batch_size,
         )
-        return pipeline
     else:
         raise NotImplementedError(
             "Not a valid pipeline. Run --help for a list of available pipelines."
