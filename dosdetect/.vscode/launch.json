@@ -1,14 +1,32 @@
 {
     "configurations": [
         {
-            "name": "Python: Module",
+            "name": "KNN",
             "type": "debugpy",
             "request": "launch",
             "module": "trainer.task",
             "args": [
                 "--pipeline",
-                "knn"
+                "knn",
+                "--train-fraction",
+                "0.2"
+            ]
+        },
+        {
+            "name": "Bi-LSTM-CNN",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "trainer.task",
+            "args": [
+                "--pipeline",
+                "bilstm-cnn",
+                "--train-fraction",
+                "0.05",
+                "--auto-tune",
+                "--bilstm-cnn-epochs",
+                "1"
             ]
         }
+        
     ]
 }
