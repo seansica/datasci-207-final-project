@@ -4,6 +4,8 @@ import json
 import logging
 import tensorflow as tf
 from tensorflow.keras.layers import Bidirectional, LSTM, Conv1D, Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+from kerastuner import HyperParameters, RandomSearch
 
 from ..utils.logger import init_logger
 
@@ -15,39 +17,97 @@ class BiLSTMCNN:
     A class for creating and managing a Bidirectional LSTM-CNN model.
     """
 
-    def __init__(self, input_shape, num_classes):
+    def __init__(self, input_shape, num_classes, auto_tune=True):
         """
         Initialize the BiLSTMCNN model with input shape and number of classes.
 
         Args:
             input_shape (tuple): Shape of the input data.
             num_classes (int): Number of output classes.
+            auto_tune (bool): Whether to use hyperparameter autotuning. Defaults to True.
         """
         self.input_shape = input_shape
         self.num_classes = num_classes
+        self.auto_tune = auto_tune
         self.model = None
-        logger.debug(f"BiLSTMCNN initialized with input shape: {input_shape}, num_classes: {num_classes}")
+        logger.debug(
+            f"BiLSTMCNN initialized with input shape: {input_shape}, num_classes: {num_classes}, auto_tune: {auto_tune}"
+        )
 
-    def build_model(self):
+    def build_model(self, hp=None):
         """
         Build the BiLSTM-CNN model architecture.
+
+        Args:
+            hp (HyperParameters): Hyperparameters for tuning. Defaults to None.
         """
         logger.info("Building BiLSTM-CNN model...")
 
         # Create the model architecture
-        self.model = tf.keras.Sequential([
-            # Convolutional layer
-            Conv1D(64, 3, activation='relu', input_shape=self.input_shape),
-            
-            # Bidirectional LSTM layers
-            Bidirectional(LSTM(128, return_sequences=True)),
-            Bidirectional(LSTM(64)),
-            
-            # Dense layers
-            Dense(64, activation='relu'),
-            Dropout(0.5),
-            Dense(self.num_classes, activation='softmax')
-        ])
+        model = tf.keras.Sequential()
+
+        # Convolutional layer
+        model.add(
+            Conv1D(
+                filters=(
+                    hp.Int("conv_filters", min_value=32, max_value=128, step=32)
+                    if hp
+                    else 64
+                ),
+                kernel_size=3,
+                activation="relu",
+                input_shape=self.input_shape,
+            )
+        )
+
+        # Bidirectional LSTM layers
+        model.add(
+            Bidirectional(
+                LSTM(
+                    units=(
+                        hp.Int("lstm_units_1", min_value=64, max_value=256, step=64)
+                        if hp
+                        else 128
+                    ),
+                    return_sequences=True,
+                )
+            )
+        )
+        model.add(
+            Bidirectional(
+                LSTM(
+                    units=(
+                        hp.Int("lstm_units_2", min_value=32, max_value=128, step=32)
+                        if hp
+                        else 64
+                    )
+                )
+            )
+        )
+
+        # Dense layers
+        model.add(
+            Dense(
+                units=(
+                    hp.Int("dense_units", min_value=32, max_value=128, step=32)
+                    if hp
+                    else 64
+                ),
+                activation="relu",
+            )
+        )
+        model.add(
+            Dropout(
+                rate=(
+                    hp.Float("dropout_rate", min_value=0.1, max_value=0.5, step=0.1)
+                    if hp
+                    else 0.5
+                )
+            )
+        )
+        model.add(Dense(self.num_classes, activation="softmax"))
+
+        self.model = model
 
         logger.debug("BiLSTM-CNN model architecture:")
         self.model.summary(print_fn=lambda x, **kwargs: logger.debug(x))
@@ -82,28 +142,43 @@ class BiLSTMCNN:
         """
         logger.info(f"Training BiLSTM-CNN model for {epochs} epochs...")
 
-        self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=validation_data)
+        # Create early stopping callback
+        early_stopping = EarlyStopping(
+            monitor="val_loss", patience=5, restore_best_weights=True
+        )
+
+        if self.auto_tune:
+            # Perform hyperparameter tuning
+            tuner = RandomSearch(
+                self.build_model,
+                objective="val_accuracy",
+                max_trials=10,
+                executions_per_trial=3,
+                directory="bilstm_cnn_tuning",
+                project_name="bilstm_cnn_tuning",
+            )
+            tuner.search(
+                X_train,
+                y_train,
+                epochs=epochs,
+                batch_size=batch_size,
+                validation_data=validation_data,
+                callbacks=[early_stopping],
+            )
+            best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
+            self.model = self.build_model(best_hps)
+            self.compile_model()
+
+        self.model.fit(
+            X_train,
+            y_train,
+            epochs=epochs,
+            batch_size=batch_size,
+            validation_data=validation_data,
+            callbacks=[early_stopping],
+        )
 
         logger.info("BiLSTM-CNN model training completed.")
-
-    def evaluate_model(self, X_test, y_test):
-        """
-        Evaluate the trained BiLSTM-CNN model on the provided test data.
-
-        Args:
-            X_test (numpy.ndarray): Test input features.
-            y_test (numpy.ndarray): Test target labels.
-
-        Returns:
-            tuple: A tuple containing the test loss and test accuracy.
-        """
-        logger.info("Evaluating BiLSTM-CNN model...")
-
-        loss, accuracy = self.model.evaluate(X_test, y_test)
-
-        logger.info(f"Test Loss: {loss:.4f}, Test Accuracy: {accuracy:.4f}")
-
-        return loss, accuracy
 
     def save_model(self, output_dir):
         """
@@ -129,11 +204,9 @@ class BiLSTMCNN:
         model_config = {
             "input_shape": self.input_shape,
             "num_classes": self.num_classes,
-            "optimizer": self.optimizer,
-            "loss": self.loss,
-            "metrics": self.metrics,
-            "epochs": self.epochs,
-            "batch_size": self.batch_size
+            "optimizer": self.model.optimizer.get_config(),
+            "loss": self.model.loss,
+            "metrics": self.model.metrics_names,
         }
         with open(companion_path, "w") as file:
             json.dump(model_config, file, indent=4)

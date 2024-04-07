@@ -20,6 +20,11 @@ def parse_arguments():
         description="Run KNN, BiLSTM-CNN, or Random Forest pipeline."
     )
     parser.add_argument(
+        "--auto-tune",
+        action="store_true",
+        help="Use KerasTuner for automatic hyperparameter tuning",
+    )
+    parser.add_argument(
         "--dataset",
         type=str,
         default="/Users/seansica/OneDrive - Sica/Education/Berkeley/W207-Applied-ML/datasci-207-final-project/datasets/CICIDS2017/MachineLearningCVE",
@@ -165,6 +170,7 @@ def main():
         pipeline = KNNPipeline(
             dataset_file_paths,
             pipeline_dir,
+            args.auto_tune,
             args.knn_correlation_threshold,
             args.knn_pca_variance_ratio,
             args.knn_n_neighbors,
@@ -187,6 +193,7 @@ def main():
         pipeline = BiLSTMCNNPipeline(
             dataset_file_paths,
             pipeline_dir,
+            args.auto_tune,
             args.bilstm_cnn_correlation_threshold,
             args.bilstm_cnn_pca_variance_ratio,
             args.bilstm_cnn_epochs,

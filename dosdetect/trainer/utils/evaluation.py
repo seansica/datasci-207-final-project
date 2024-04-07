@@ -1,4 +1,3 @@
-import logging
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -43,11 +42,15 @@ class Evaluator:
 
         logger.debug("Evaluator initialized with the trained model.")
 
-    def evaluate(self, X_test, y_test):
+    def evaluate(self, X_train, y_train, X_val, y_val, X_test, y_test):
         """
         Evaluate the model on the test set.
 
         Args:
+            X_train (numpy.ndarray): Training input features.
+            y_train (numpy.ndarray): Training target labels.
+            X_val (numpy.ndarray): Validation input features.
+            y_val (numpy.ndarray): Validation target labels.
             X_test (numpy.ndarray): Test input features.
             y_test (numpy.ndarray): Test target labels.
 
@@ -57,20 +60,52 @@ class Evaluator:
         logger.debug(f"Evaluating model of type: {type(self.model)}")
 
         if isinstance(self.model, tf.keras.models.Model):
-            metrics = self._evaluate_keras_model(X_test, y_test)
+            metrics = self._evaluate_keras_model(
+                X_train, y_train, X_val, y_val, X_test, y_test
+            )
         else:
             metrics = self._evaluate_sklearn_model(X_test, y_test)
 
         self._save_evaluation_metrics(metrics)
         return metrics
 
-    def _evaluate_keras_model(self, X_test, y_test):
+    def _evaluate_keras_model(self, X_train, y_train, X_val, y_val, X_test, y_test):
         """
         Evaluate a Keras model.
         """
+        train_loss, train_acc = self.model.evaluate(X_train, y_train)
+        val_loss, val_acc = self.model.evaluate(X_val, y_val)
+        test_loss, test_acc = self.model.evaluate(X_test, y_test)
+
+        # Plot training and evaluation curves
+        history = self.model.history.history
+        self._plot_curves(
+            history["loss"], history["val_loss"], "Training and Validation Loss", "loss"
+        )
+        self._plot_curves(
+            history["accuracy"],
+            history["val_accuracy"],
+            "Training and Validation Accuracy",
+            "accuracy",
+        )
+
         y_pred_prob = self.model.predict(X_test)
         y_pred = np.argmax(y_pred_prob, axis=1)
         return self._compute_metrics(y_test, y_pred, y_pred_prob)
+
+    def _plot_curves(self, train_curve, val_curve, title, filename):
+        """
+        Plot training and validation curves and save the plot to a file.
+        """
+        plt.figure()
+        plt.plot(train_curve, label="Training")
+        plt.plot(val_curve, label="Validation")
+        plt.title(title)
+        plt.xlabel("Epoch")
+        plt.ylabel(filename.capitalize())
+        plt.legend()
+        plt.savefig(os.path.join(self.output_dir, f"{filename}_curve.png"))
+        plt.close()
 
     def _evaluate_sklearn_model(self, X_test, y_test):
         """

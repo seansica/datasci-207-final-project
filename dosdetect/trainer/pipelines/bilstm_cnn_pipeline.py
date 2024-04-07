@@ -12,17 +12,23 @@ logger = init_logger("bilstm_cnn_pipeline_logger")
 
 
 class BiLSTMCNNPipeline(BasePipeline):
+
     def __init__(
         self,
         dataset_file_paths,
         pipeline_dir,
-        correlation_threshold,
-        pca_variance_ratio,
-        epochs,
-        batch_size,
+        auto_tune=True,
+        correlation_threshold=None,
+        pca_variance_ratio=None,
+        epochs=None,
+        batch_size=None,
     ):
         super().__init__(
-            dataset_file_paths, pipeline_dir, correlation_threshold, pca_variance_ratio
+            dataset_file_paths,
+            pipeline_dir,
+            auto_tune,
+            correlation_threshold,
+            pca_variance_ratio,
         )
         self.epochs = epochs
         self.batch_size = batch_size
@@ -32,6 +38,7 @@ class BiLSTMCNNPipeline(BasePipeline):
 
         pipeline_details = {
             "pipeline_type": "BiLSTM-CNN",
+            "auto_tune": self.auto_tune,
             "correlation_threshold": self.correlation_threshold,
             "pca_variance_ratio": self.pca_variance_ratio,
             "epochs": self.epochs,
@@ -53,7 +60,7 @@ class BiLSTMCNNPipeline(BasePipeline):
                      f"Test: {X_test.shape}, {y_test.shape}")
 
         input_shape = (X_train.shape[1], 1)
-        bilstm_cnn = BiLSTMCNN(input_shape, num_classes)
+        bilstm_cnn = BiLSTMCNN(input_shape, num_classes, self.auto_tune)
         bilstm_cnn.build_model()
         logger.info("BiLSTM-CNN model created.")
 
@@ -70,8 +77,8 @@ class BiLSTMCNNPipeline(BasePipeline):
         )
         logger.info("Model training completed.")
 
-        test_loss, test_accuracy = bilstm_cnn.evaluate_model(X_test, y_test)
-        logger.info(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
+        # test_loss, test_accuracy = bilstm_cnn.evaluate_model(X_test, y_test)
+        # logger.info(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
 
         bilstm_cnn.save_model(self.pipeline_dir)
         logger.info("Model saved.")
@@ -79,7 +86,10 @@ class BiLSTMCNNPipeline(BasePipeline):
         self.evaluate_model(
             bilstm_cnn.model,
             self.pipeline_dir,
-            "bilstm_cnn_model",
+            X_train,
+            y_train,
+            X_val,
+            y_val,
             X_test,
             y_test,
             label_mappings,

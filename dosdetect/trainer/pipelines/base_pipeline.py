@@ -9,21 +9,25 @@ logger = init_logger("base_pipeline_logger")
 
 
 class BasePipeline:
+
     def __init__(
         self,
         dataset_file_paths,
         pipeline_dir,
+        auto_tune,
         correlation_threshold,
         pca_variance_ratio,
     ):
         self.dataset_file_paths = dataset_file_paths
         self.pipeline_dir = pipeline_dir
+        self.auto_tune = auto_tune
         self.correlation_threshold = correlation_threshold
         self.pca_variance_ratio = pca_variance_ratio
 
         logger.debug(
             f"BasePipeline initialized with file paths: {dataset_file_paths}, "
             f"pipeline directory: {self.pipeline_dir}, "
+            f"hyperparameter auto-tune: {auto_tune}, "
             f"correlation threshold: {correlation_threshold}, "
             f"PCA variance ratio: {pca_variance_ratio}"
         )
@@ -63,9 +67,27 @@ class BasePipeline:
 
         return data_loader, X_preprocessed, y_encoded, label_mappings
 
-    def evaluate_model(self, model, pipeline_dir, X_test, y_test, label_mappings):
+    def evaluate_model(
+        self,
+        model,
+        pipeline_dir,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        X_test,
+        y_test,
+        label_mappings,
+    ):
         evaluator = Evaluator(model, pipeline_dir, label_mappings)
         logger.debug("Evaluator created.")
 
-        evaluator.evaluate(X_test, y_test)
+        evaluator.evaluate(
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+            X_test,
+            y_test,
+        )
         logger.info("Model evaluation completed.")

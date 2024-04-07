@@ -5,6 +5,7 @@ import json
 import os
 import joblib
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
 
 from ..utils.logger import init_logger
 
@@ -16,23 +17,27 @@ class KNN:
     A class for creating and managing a K-Nearest Neighbors (KNN) model.
     """
 
-    def __init__(self, n_neighbors=5):
+    def __init__(self, n_neighbors=5, auto_tune=False):
         """
         Initialize the KNN model with the specified number of neighbors.
 
         Args:
             n_neighbors (int): Number of neighbors to consider. Defaults to 5.
+            auto_tune (bool): Whether to use GridSearchCV for hyperparameter tuning. Defaults to False.
         """
         self.n_neighbors = n_neighbors
+        self.auto_tune = auto_tune
         self.model = None
-        logger.debug(f"KNN initialized with n_neighbors={n_neighbors}")
+        logger.debug(
+            f"KNN initialized with n_neighbors={n_neighbors}, auto_tune={auto_tune}"
+        )
 
     def build_model(self):
         """
         Build the KNN model.
         """
         logger.info("Building KNN model...")
-        self.model = KNeighborsClassifier(n_neighbors=self.n_neighbors)
+        self.model = KNeighborsClassifier()
         logger.info("KNN model built.")
 
     def train(self, X_train, y_train):
@@ -44,7 +49,26 @@ class KNN:
             y_train (numpy.ndarray): Training target labels.
         """
         logger.info("Training KNN model...")
-        self.model.fit(X_train, y_train)
+
+        if self.auto_tune:
+            # Define the hyperparameter grid for tuning
+            param_grid = {
+                "n_neighbors": list(range(1, 31)),
+                "weights": ["uniform", "distance"],
+                "p": [1, 2],
+            }
+
+            # Perform grid search with cross-validation
+            grid_search = GridSearchCV(self.model, param_grid, cv=5, scoring="accuracy")
+            grid_search.fit(X_train, y_train)
+
+            # Set the best hyperparameters found by grid search
+            self.model = grid_search.best_estimator_
+            logger.info(f"Best hyperparameters: {grid_search.best_params_}")
+        else:
+            self.model.set_params(n_neighbors=self.n_neighbors)
+            self.model.fit(X_train, y_train)
+
         logger.info("KNN model training completed.")
 
     def predict(self, X):
