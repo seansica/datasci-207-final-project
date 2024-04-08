@@ -1,3 +1,5 @@
+import os
+
 from ..data.data_loader import DataLoader
 from ..preprocessing.preprocessor import PreprocessorBuilder
 from ..utils.logger import init_logger
@@ -17,7 +19,7 @@ class BasePipeline:
         pca_variance_ratio,
     ):
         self.dataset_file_paths = dataset_file_paths
-        self.pipeline_dir = pipeline_dir
+        self.pipeline_dir = os.path.expanduser(pipeline_dir)
         self.auto_tune = auto_tune
         self.train_fraction = train_fraction
         self.correlation_threshold = correlation_threshold
