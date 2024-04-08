@@ -7,7 +7,7 @@ from .utils.logger import configure_logging
 from .pipelines.bilstm_cnn_pipeline import BiLSTMCNNPipeline
 from .pipelines.knn_pipeline import KNNPipeline
 from .pipelines.random_forest_pipeline import RandomForestPipeline
-
+from .pipelines.logistic_regression_pipeline import LogisticRegressionPipeline
 
 def parse_arguments():
     """
@@ -40,8 +40,8 @@ def parse_arguments():
         "--pipeline",
         type=str,
         default="bilstm-cnn",
-        choices=["knn", "bilstm-cnn", "random-forest"],
-        help='Choose the pipeline to run: "knn", "bilstm-cnn", or "random-forest" (default: "bilstm-cnn")',
+        choices=["bilstm-cnn", "knn", "random-forest", "logistic-regression"],
+        help='Choose the pipeline to run: "knn", "bilstm-cnn", "random-forest", or "logistic-regression" (default: "bilstm-cnn")',
     )
     parser.add_argument(
         "--log-dir",
@@ -134,9 +134,60 @@ def parse_arguments():
         help="Random state for Random Forest pipeline (default: None)",
     )
 
+    # Logistic Regression pipeline hyperparameters
+    parser.add_argument(
+        "--logistic-regression-correlation-threshold",
+        type=float,
+        default=0.9,
+        help="Correlation threshold for Logistic Regression pipeline (default: 0.9)",
+    )
+    parser.add_argument(
+        "--logistic-regression-pca-variance-ratio",
+        type=float,
+        default=0.95,
+        help="PCA variance ratio for Logistic Regression pipeline (default: 0.95)",
+    )
+    parser.add_argument(
+        "--logistic-regression-C",
+        type=float,
+        default=1.0,
+        help="Inverse of regularization strength for Logistic Regression pipeline (default: 1.0)",
+    )
+    parser.add_argument(
+        "--logistic-regression-max-iter",
+        type=int,
+        default=100,
+        help="Maximum number of iterations for Logistic Regression pipeline (default: 100)",
+    )
+    parser.add_argument(
+        "--logistic-regression-random-state",
+        type=int,
+        default=None,
+        help="Random state for Logistic Regression pipeline (default: None)",
+    )
+
     args = parser.parse_args()
 
     return args
+
+
+def init_pipeline_dir(model_dir, pipeline_name):
+    """Initialize the pipeline directory.
+
+    This function creates a new directory for the pipeline with a unique timestamp appended to the name.
+    If the directory already exists, it will not be recreated.
+
+    Args:
+        model_dir (str): The base directory where the pipeline directory will be created.
+        pipeline_name (str): The name of the pipeline.
+
+    Returns:
+        str: The path to the newly created pipeline directory.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    pipeline_dir = os.path.join(model_dir, f"{pipeline_name}_{timestamp}")
+    os.makedirs(pipeline_dir, exist_ok=True)
+    return pipeline_dir
 
 
 def main():
@@ -145,17 +196,8 @@ def main():
     """
     args = parse_arguments()
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    if args.pipeline == "knn":
-        pipeline_dir = os.path.join(args.model_dir, f"knn_pipeline_{timestamp}")
-    elif args.pipeline == "bilstm-cnn":
-        pipeline_dir = os.path.join(args.model_dir, f"bilstm_cnn_pipeline_{timestamp}")
-    else:
-        pipeline_dir = os.path.join(
-            args.model_dir, f"random_forest_pipeline_{timestamp}"
-        )
-
-    os.makedirs(pipeline_dir, exist_ok=True)
+    # Initialize a directory to store all logs and files generated files during the pipeline execution
+    pipeline_dir = init_pipeline_dir(args.model_dir, f"{args.pipeline}_pipeline")
 
     # Configure the root logger
     configure_logging(pipeline_dir)
@@ -171,8 +213,7 @@ def main():
         f"{args.dataset}/Wednesday-workingHours.pcap_ISCX.csv",
     ]
 
-    if args.pipeline == 'knn':
-        pipeline_dir = os.path.join(args.model_dir, f"knn_pipeline_{timestamp}")
+    if args.pipeline == "knn":
         pipeline = KNNPipeline(
             dataset_file_paths,
             pipeline_dir,
@@ -183,20 +224,30 @@ def main():
             args.knn_n_neighbors,
         )
     elif args.pipeline == "random-forest":
-        pipeline_dir = os.path.join(
-            args.model_dir, f"random_forest_pipeline_{timestamp}"
-        )
         pipeline = RandomForestPipeline(
             dataset_file_paths,
             pipeline_dir,
+            args.auto_tune,
+            args.train_fraction,
             args.random_forest_correlation_threshold,
             args.random_forest_pca_variance_ratio,
             args.random_forest_n_estimators,
             args.random_forest_max_depth,
             args.random_forest_random_state,
         )
+    elif args.pipeline == "logistic-regression":
+        pipeline = LogisticRegressionPipeline(
+            dataset_file_paths,
+            pipeline_dir,
+            args.auto_tune,
+            args.train_fraction,
+            args.logistic_regression_correlation_threshold,
+            args.logistic_regression_pca_variance_ratio,
+            args.logistic_regression_C,
+            args.logistic_regression_max_iter,
+            args.logistic_regression_random_state,
+        )
     elif args.pipeline == "bilstm-cnn":
-        pipeline_dir = os.path.join(args.model_dir, f"bilstm_cnn_pipeline_{timestamp}")
         pipeline = BiLSTMCNNPipeline(
             dataset_file_paths,
             pipeline_dir,

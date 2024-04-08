@@ -1,3 +1,4 @@
+from enum import Enum
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
@@ -9,6 +10,15 @@ from ..utils.logger import init_logger
 
 
 logger = init_logger("preprocessor_logger")
+
+
+class PreprocessorOptions(Enum):
+    DATA_CLEANING = 0
+    CORRELATED_FEATURE_REMOVAL = 1
+    PCA = 2
+    DATA_SCALING = 3
+    LABEL_ENCODING = 4
+    ONE_HOT_ENCODING = 5
 
 
 class PreprocessorBuilder:
@@ -30,7 +40,7 @@ class PreprocessorBuilder:
         Returns:
             PreprocessorBuilder: The builder instance with the one-hot encoding step added.
         """
-        self.steps.append(OneHotEncoder())
+        self.steps.append((PreprocessorOptions.ONE_HOT_ENCODING, OneHotEncoder()))
         logger.debug("One-hot encoding step added to PreprocessorBuilder.")
         return self
 
@@ -41,7 +51,7 @@ class PreprocessorBuilder:
         Returns:
             PreprocessorBuilder: The builder instance with the label encoding step added.
         """
-        self.steps.append(LabelEncoder())
+        self.steps.append((PreprocessorOptions.LABEL_ENCODING, LabelEncoder()))
         self.label_mappings = None  # Initialize label_mappings attribute
         logger.debug("Label encoding step added to PreprocessorBuilder.")
         return self
@@ -57,7 +67,12 @@ class PreprocessorBuilder:
         Returns:
             PreprocessorBuilder: The builder instance with the correlated feature removal step added.
         """
-        self.steps.append(CorrelatedFeatureRemover(correlation_threshold))
+        self.steps.append(
+            (
+                PreprocessorOptions.CORRELATED_FEATURE_REMOVAL,
+                CorrelatedFeatureRemover(correlation_threshold),
+            )
+        )
         logger.debug(f"Correlated feature removal step added to PreprocessorBuilder with threshold {correlation_threshold}.")
         return self
 
@@ -72,7 +87,7 @@ class PreprocessorBuilder:
         Returns:
             PreprocessorBuilder: The builder instance with the PCA transformation step added.
         """
-        self.steps.append(PCATransformer(pca_variance_ratio))
+        self.steps.append((PreprocessorOptions.PCA, PCATransformer(pca_variance_ratio)))
         logger.debug(f"PCA transformation step added to PreprocessorBuilder with variance ratio {pca_variance_ratio}.")
         return self
 
@@ -87,8 +102,12 @@ class PreprocessorBuilder:
         Returns:
             PreprocessorBuilder: The builder instance with the data cleaning step added.
         """
-        self.steps.append(DataCleaner(fill_method))
+        self.steps.append((PreprocessorOptions.DATA_CLEANING, DataCleaner(fill_method)))
         logger.debug(f"Data cleaning step added to PreprocessorBuilder with fill method '{fill_method}'.")
+        return self
+
+    def with_data_scaling(self, scaler):
+        self.steps.append((PreprocessorOptions.DATA_SCALING, scaler))
         return self
 
     def build(self):
@@ -107,6 +126,8 @@ class Preprocessor:
     """
     Preprocessor class for applying a sequence of preprocessing steps to the data.
     """
+
+    CorrelatedFeatureRemoval = 0
 
     def __init__(self, steps):
         """
@@ -135,22 +156,31 @@ class Preprocessor:
 
         label_mappings = None  # to be set by encode_labels
 
-        for step in self.steps:
-            if isinstance(step, LabelEncoder):
-                logger.info("Applying label encoding...")
-                y_encoded, label_mappings = self.encode_labels(y, step)
-            elif isinstance(step, OneHotEncoder):
-                logger.info("Applying one-hot encoding...")
-                y_encoded = step.encode_labels(y_encoded, num_classes)
-            elif isinstance(step, CorrelatedFeatureRemover):
-                logger.info("Removing correlated features...")
-                X = step.remove_correlated_features(X)
-            elif isinstance(step, PCATransformer):
-                logger.info("Applying PCA transformation...")
-                X = step.apply_pca(X)
-            elif isinstance(step, DataCleaner):
+        for step, params in self.steps:
+
+            if step == PreprocessorOptions.DATA_CLEANING:
                 logger.info("Cleaning data...")
-                X = step.clean_data(X)
+                X = params.clean_data(X)
+
+            elif step == PreprocessorOptions.CORRELATED_FEATURE_REMOVAL:
+                logger.info("Removing correlated features...")
+                X = params.remove_correlated_features(X)
+
+            elif step == PreprocessorOptions.PCA:
+                logger.info("Applying PCA transformation...")
+                X = params.apply_pca(X)
+
+            elif step == PreprocessorOptions.DATA_SCALING:
+                logger.info("Applying data scaling...")
+                X = params.fit_transform(X)
+
+            elif step == PreprocessorOptions.LABEL_ENCODING:
+                logger.info("Applying label encoding...")
+                y_encoded, label_mappings = self.encode_labels(y, params)
+
+            elif step == PreprocessorOptions.ONE_HOT_ENCODING:
+                logger.info("Applying one-hot encoding...")
+                y_encoded = params.encode_labels(y_encoded, num_classes)
 
         logger.info("Data preprocessing completed.")
         return X, y_encoded, label_mappings

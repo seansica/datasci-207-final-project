@@ -193,7 +193,13 @@ class SKLearnEvaluator(BaseEvaluator):
         logger.debug("Evaluating scikit-learn model.")
         y_pred = self.model.predict(X_test)
         y_pred_prob = self.model.predict_proba(X_test)
-        metrics = self._compute_metrics_sklearn(y_test, y_pred, y_pred_prob)
+
+        # metrics = self._compute_metrics_sklearn(y_test, y_pred, y_pred_prob)
+        if len(y_test.shape) == 1 and len(y_pred.shape) == 1:
+            metrics = self._compute_metrics_sklearn_1d(y_test, y_pred, y_pred_prob)
+        else:
+            metrics = self._compute_metrics_sklearn(y_test, y_pred, y_pred_prob)
+
         self._save_evaluation_metrics(metrics)
         logger.debug("Model evaluation completed.")
         return metrics
@@ -371,4 +377,104 @@ class SKLearnEvaluator(BaseEvaluator):
         plt.legend(loc="lower right")
 
         plt.savefig(os.path.join(self.output_dir, "roc_curves.png"))
+        plt.close()
+
+    def _compute_metrics_sklearn_1d(self, y_true, y_pred, y_prob):
+        metrics = {}
+
+        # Iterate over each class using its label name
+        for label_name in self.label_mappings.keys():
+            logger.info(f"Computing metrics for class: {label_name}")
+
+            # Convert labels to binary format for the current class
+            y_true_binary = (y_true == self.label_mappings[label_name]).astype(int)
+            y_pred_binary = (y_pred == self.label_mappings[label_name]).astype(int)
+
+            # Get the probabilities for the current class
+            class_probabilities = y_prob[:, self.label_mappings[label_name]]
+
+            # Calculate various metrics for the current class
+            metrics[label_name] = {
+                "accuracy": accuracy_score(y_true_binary, y_pred_binary),
+                "precision": precision_score(
+                    y_true_binary, y_pred_binary, average="binary", zero_division=0
+                ),
+                "recall": recall_score(
+                    y_true_binary, y_pred_binary, average="binary", zero_division=0
+                ),
+                "f1_score": f1_score(
+                    y_true_binary, y_pred_binary, average="binary", zero_division=0
+                ),
+                "auc": roc_auc_score(y_true_binary, class_probabilities),
+            }
+
+            # Plot the ROC curve for the current class
+            self._plot_roc_curve_sklearn(y_true_binary, class_probabilities, label_name)
+            self._plot_confusion_matrix_for_class(
+                y_true_binary, y_pred_binary, label_name
+            )
+
+        self._plot_combined_roc_curve_1d(y_true, y_prob)
+        self._plot_global_confusion_matrix_1d(y_true, y_pred)
+
+        return metrics
+
+    def _plot_combined_roc_curve_1d(self, y_true, y_prob):
+        """
+        Plot a combined ROC curve for all classes on the same graph.
+
+        Parameters:
+        - y_true: 1D array of shape (n_samples,), true labels.
+        - y_prob: 2D array of shape (n_samples, n_classes), predicted probabilities for each class.
+        """
+        plt.figure(figsize=(10, 8))
+
+        # Process each class
+        for label_name, label_index in self.label_mappings.items():
+            # Convert labels to binary format for the current class
+            y_true_binary = (y_true == label_index).astype(int)
+
+            # Get the probabilities for the current class
+            class_probabilities = y_prob[:, label_index]
+
+            fpr, tpr, _ = roc_curve(y_true_binary, class_probabilities)
+            roc_auc = auc(fpr, tpr)
+
+            plt.plot(fpr, tpr, lw=2, label=f"{label_name} (area = {roc_auc:.2f})")
+
+        plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.title("Combined ROC Curve for All Classes")
+        plt.legend(loc="lower right")
+
+        plt.savefig(os.path.join(self.output_dir, "roc_curves.png"))
+        plt.close()
+
+    def _plot_global_confusion_matrix_1d(self, y_true, y_pred):
+        """
+        Plot and save a global confusion matrix that encompasses all classes.
+
+        Parameters:
+        - y_true: 1D array of shape (n_samples,), true labels.
+        - y_pred: 1D array of shape (n_samples,), predicted labels.
+        """
+        cm = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(12, 10))
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=list(self.label_mappings.keys()),
+            yticklabels=list(self.label_mappings.keys()),
+        )
+        plt.title("Global Confusion Matrix")
+        plt.ylabel("Actual")
+        plt.xlabel("Predicted")
+        plt.tight_layout()
+
+        plt.savefig(os.path.join(self.output_dir, "confusion_matrix.png"))
         plt.close()
