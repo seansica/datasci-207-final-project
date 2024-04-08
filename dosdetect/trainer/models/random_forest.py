@@ -1,6 +1,4 @@
 # models/random_forest.py
-from datetime import datetime
-import logging
 import json
 import os
 import joblib
@@ -43,12 +41,7 @@ class RandomForest:
         Build the Random Forest model.
         """
         logger.info("Building Random Forest model...")
-        self.model = RandomForestClassifier(
-            n_estimators=self.n_estimators,
-            max_depth=self.max_depth,
-            random_state=self.random_state,
-            verbose=1,
-        )
+        self.model = RandomForestClassifier()
         logger.info("Random Forest model built.")
 
     def train(self, X_train, y_train):
@@ -76,8 +69,14 @@ class RandomForest:
 
             # Set the best hyperparameters found by grid search
             self.model = grid_search.best_estimator_
+            self._best_params = grid_search.best_params_
             logger.info(f"Best hyperparameters: {grid_search.best_params_}")
         else:
+            self.model.set_params(
+                n_estimators=self.n_estimators,
+                max_depth=self.max_depth,
+                random_state=self.random_state,
+            )
             self.model.fit(X_train, y_train)
 
         logger.info("Random Forest model training completed.")
@@ -114,13 +113,18 @@ class RandomForest:
         model_path = os.path.join(expanded_output_dir, "model.pkl")
         joblib.dump(self.model, model_path)
 
+        # logger.info(f"Random Forest model saved to {model_path}")
+
         companion_path = os.path.join(expanded_output_dir, "hyperparameters.json")
-        model_config = {
-            "n_estimators": self.n_estimators,
-            "max_depth": self.max_depth,
-            "random_state": self.random_state,
-            "auto_tune": self.auto_tune,
-        }
+        model_config = (
+            self._best_params
+            if self.auto_tune
+            else {
+                "n_estimators": self.n_estimators,
+                "max_depth": self.max_depth,
+                "random_state": self.random_state,
+            }
+        )
         with open(companion_path, "w") as file:
             json.dump(model_config, file, indent=4)
 
