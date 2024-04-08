@@ -64,6 +64,7 @@ class KNN:
 
             # Set the best hyperparameters found by grid search
             self.model = grid_search.best_estimator_
+            self._best_params = grid_search.best_params_
             logger.info(f"Best hyperparameters: {grid_search.best_params_}")
         else:
             self.model.set_params(n_neighbors=self.n_neighbors)
@@ -104,9 +105,9 @@ class KNN:
         joblib.dump(self.model, model_path)
 
         companion_path = os.path.join(expanded_output_dir, "hyperparameters.json")
-        model_config = {
-            "n_neighbors": self.n_neighbors
-        }
+        model_config = (
+            self._best_params if self.auto_tune else {"n_neighbors": self.n_neighbors}
+        )
         with open(companion_path, "w") as file:
             json.dump(model_config, file, indent=4)
 
