@@ -5,6 +5,7 @@ import os
 from ..utils.evaluation import SKLearnEvaluator
 
 from .base_pipeline import BasePipeline
+from ..preprocessing.preprocessor import PreprocessorBuilder
 from ..models.knn import KNN
 from ..utils.logger import init_logger
 
@@ -48,7 +49,21 @@ class KNNPipeline(BasePipeline):
         with open(os.path.join(self.pipeline_dir, "pipeline_details.json"), "w") as f:
             json.dump(pipeline_details, f)
 
-        data_loader, X_preprocessed, y_encoded, label_mappings = self.preprocess_data()
+        preprocessor = (
+            PreprocessorBuilder()
+            .with_data_cleaning(fill_method="median")
+            .with_correlated_feature_removal(
+                correlation_threshold=self.correlation_threshold
+            )
+            .with_pca(pca_variance_ratio=self.pca_variance_ratio)
+            # .with_sparse_encoding()
+            .with_one_hot_encoding()
+            .build()
+        )
+
+        data_loader, X_preprocessed, y_encoded, label_mappings = self.initialize(
+            preprocessor=preprocessor
+        )
 
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = data_loader.split_data(
             X_preprocessed, y_encoded

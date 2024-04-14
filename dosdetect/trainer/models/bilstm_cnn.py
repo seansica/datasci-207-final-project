@@ -3,8 +3,9 @@ import os
 import json
 import logging
 import tensorflow as tf
-from tensorflow.keras.layers import Bidirectional, LSTM, Conv1D, Dense, Dropout
+from tensorflow.keras.layers import Bidirectional, LSTM, Conv1D, Dense, Dropout, Flatten
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Attention
 from kerastuner import HyperParameters, RandomSearch
 
 from ..utils.logger import init_logger
@@ -34,31 +35,24 @@ class BiLSTMCNN:
             f"BiLSTMCNN initialized with input shape: {input_shape}, num_classes: {num_classes}, auto_tune: {auto_tune}"
         )
 
-    def build_model(self, hp=None):
+    def build_model(self, hp=None, binary_classification=False):
         """
         Build the BiLSTM-CNN model architecture.
 
         Args:
             hp (HyperParameters): Hyperparameters for tuning. Defaults to None.
+            binary_classification (bool): Whether to use binary classification or multi-class classification.
         """
-        logger.info("Building BiLSTM-CNN model...")
+        logger.info("Building BiLSTM-CNN model with attention mechanism...")
 
         # Create the model architecture
         model = tf.keras.Sequential()
 
-        # Convolutional layer
-        model.add(
-            Conv1D(
-                filters=(
-                    hp.Int("conv_filters", min_value=32, max_value=128, step=32)
-                    if hp
-                    else 64
-                ),
-                kernel_size=3,
-                activation="relu",
-                input_shape=self.input_shape,
-            )
-        )
+        # Input layer
+        model.add(tf.keras.layers.InputLayer(shape=self.input_shape))
+
+        # TODO Attention layer
+        # model.add(Attention(use_scale=True))
 
         # Bidirectional LSTM layers
         model.add(
@@ -80,10 +74,33 @@ class BiLSTMCNN:
                         hp.Int("lstm_units_2", min_value=32, max_value=128, step=32)
                         if hp
                         else 64
-                    )
+                    ),
+                    # The output shape of the last LSTM layer is (batch_size, units), where units is the number of units in the last LSTM layer.
+                    # However, the Conv1D layer expects an input shape of (batch_size, timesteps, features), where timesteps is the number of
+                    # time steps and features is the number of features per time step.
+                    # To resolve this issue, you can modify the last LSTM layer to return sequences by setting return_sequences=True.
+                    # This will ensure that the output shape of the last LSTM layer is (batch_size, timesteps, units), which is compatible with
+                    # the input shape expected by the Conv1D layer.
+                    return_sequences=True,
                 )
             )
         )
+
+        # Convolutional layer
+        model.add(
+            Conv1D(
+                filters=(
+                    hp.Int("conv_filters", min_value=32, max_value=128, step=32)
+                    if hp
+                    else 64
+                ),
+                kernel_size=3,
+                activation="relu",
+            )
+        )
+
+        # Flatten layer
+        model.add(Flatten())
 
         # Dense layers
         model.add(
@@ -105,7 +122,11 @@ class BiLSTMCNN:
                 )
             )
         )
-        model.add(Dense(self.num_classes, activation="softmax"))
+
+        # Output layer
+        num_output_units = 1 if binary_classification else self.num_classes
+        activation = "sigmoid" if binary_classification else "softmax"
+        model.add(Dense(num_output_units, activation=activation))
 
         self.model = model
 
@@ -147,7 +168,7 @@ class BiLSTMCNN:
         logger.info(f"Training BiLSTM-CNN model for {epochs} epochs...")
 
         # Create early stopping callback
-        early_stopping = tf.keras.callbacks.EarlyStopping(
+        early_stopping = EarlyStopping(
             monitor="val_loss", patience=5, restore_best_weights=True
         )
 

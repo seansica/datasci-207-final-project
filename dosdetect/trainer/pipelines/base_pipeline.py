@@ -1,7 +1,8 @@
 import os
 
 from ..data.data_loader import DataLoader
-from ..preprocessing.preprocessor import PreprocessorBuilder
+from ..preprocessing.data_cleaner import DataCleaner
+from ..preprocessing.preprocessor import Preprocessor
 from ..utils.logger import init_logger
 
 logger = init_logger(__name__)
@@ -34,65 +35,32 @@ class BasePipeline:
             f"PCA variance ratio: {pca_variance_ratio}"
         )
 
-    def preprocess_data(self):
+    def initialize(self, preprocessor: Preprocessor):
+        
+        # Load the data
         data_loader = DataLoader(self.dataset_file_paths)
         logger.debug("DataLoader created.")
-
         all_data = data_loader.load_data(self.train_fraction)
         logger.info(f"Data loaded. Shape: {all_data.shape}")
 
-        X = all_data.drop(columns=[" Label"])
-        y = all_data[" Label"]
+        # Sanitize column names immediately after loading
+        data_cleaner = DataCleaner()
+        all_data = data_cleaner.sanitize_column_names(all_data)
+
+        # Split X and y (labels)
+        X = all_data.drop(columns=["label"])
+        y = all_data["label"]
         logger.debug("Features (X) and labels (y) extracted from the loaded data.")
 
-        preprocessor = (
-            PreprocessorBuilder()
-            .with_data_cleaning(fill_method="median")
-            .with_correlated_feature_removal(
-                correlation_threshold=self.correlation_threshold
-            )
-            .with_pca(pca_variance_ratio=self.pca_variance_ratio)
-            .with_label_encoding()
-            .with_one_hot_encoding()
-            .build()
-        )
-        logger.debug(
+        logger.info(
             "Preprocessor built with data cleaning, correlated feature removal, PCA, and label encoding."
         )
 
-        X_preprocessed, y_encoded, label_mappings = preprocessor.preprocess_data(
-            X, y
-        )
-        # y_encoded = y_encoded_tuple[0]
+        # Apply feature engineering
+        X_preprocessed, y_encoded, label_mappings = preprocessor.transform(X, y)
+
         logger.info(
             f"Data preprocessing completed. Preprocessed features shape: {X_preprocessed.shape}"
         )
 
         return data_loader, X_preprocessed, y_encoded, label_mappings
-
-    # def evaluate_model(
-    #     self,
-    #     model,
-    #     pipeline_dir,
-    #     X_train,
-    #     y_train,
-    #     X_val,
-    #     y_val,
-    #     X_test,
-    #     y_test,
-    #     label_mappings,
-    #     history
-    # ):
-    #     evaluator = Evaluator(model, pipeline_dir, label_mappings)
-    #     logger.debug("Evaluator created.")
-
-    #     evaluator.evaluate(
-    #         X_train,
-    #         y_train,
-    #         X_val,
-    #         y_val,
-    #         X_test,
-    #         y_test,
-    #         history
-    #     )
-    #     logger.info("Model evaluation completed.")

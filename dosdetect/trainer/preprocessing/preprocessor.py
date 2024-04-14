@@ -1,11 +1,12 @@
 from enum import Enum
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
-from sklearn.decomposition import PCA
-from tensorflow.keras.utils import to_categorical
-import re
-import logging
+
+from sklearn.preprocessing import LabelEncoder
+
+from .encoder import LabelEncoderHandler
+from .correlation import CorrelatedFeatureRemover
+from .data_cleaner import DataCleaner
+from .pca import PCATransformer
+
 from ..utils.logger import init_logger
 
 logger = init_logger(__name__)
@@ -13,11 +14,12 @@ logger = init_logger(__name__)
 
 class PreprocessorOptions(Enum):
     DATA_CLEANING = 0
-    CORRELATED_FEATURE_REMOVAL = 1
-    PCA = 2
-    DATA_SCALING = 3
-    LABEL_ENCODING = 4
-    ONE_HOT_ENCODING = 5
+    COLUMN_SANITIZATION = 1
+    CORRELATED_FEATURE_REMOVAL = 2
+    PCA = 3
+    DATA_SCALING = 4
+    SPARSE_ENCODING = 5
+    ONE_HOT_ENCODING = 6
 
 
 class PreprocessorBuilder:
@@ -39,20 +41,23 @@ class PreprocessorBuilder:
         Returns:
             PreprocessorBuilder: The builder instance with the one-hot encoding step added.
         """
-        self.steps.append((PreprocessorOptions.ONE_HOT_ENCODING, OneHotEncoder()))
+        self.steps.append(
+            (PreprocessorOptions.ONE_HOT_ENCODING, LabelEncoderHandler(mode="one_hot"))
+        )
         logger.debug("One-hot encoding step added to PreprocessorBuilder.")
         return self
 
-    def with_label_encoding(self):
+    def with_sparse_encoding(self):
         """
-        Add label encoding step to the preprocessing pipeline.
+        Add sparse label encoding step to the preprocessing pipeline.
 
         Returns:
-            PreprocessorBuilder: The builder instance with the label encoding step added.
+            PreprocessorBuilder: The builder instance with the sparse encoding step added.
         """
-        self.steps.append((PreprocessorOptions.LABEL_ENCODING, LabelEncoder()))
-        self.label_mappings = None  # Initialize label_mappings attribute
-        logger.debug("Label encoding step added to PreprocessorBuilder.")
+        self.steps.append(
+            (PreprocessorOptions.SPARSE_ENCODING, LabelEncoderHandler(mode="sparse"))
+        )
+        logger.debug("Sparse encoding step added to PreprocessorBuilder.")
         return self
 
     def with_correlated_feature_removal(self, correlation_threshold=0.9):
@@ -105,8 +110,14 @@ class PreprocessorBuilder:
         logger.debug(f"Data cleaning step added to PreprocessorBuilder with fill method '{fill_method}'.")
         return self
 
+    def with_column_sanitization(self):
+        self.steps.append(PreprocessorOptions.COLUMN_SANITIZATION, DataCleaner())
+        logger.debug(f"Column sanitization step added to PreprocessorBuilder.")
+        return self
+
     def with_data_scaling(self, scaler):
         self.steps.append((PreprocessorOptions.DATA_SCALING, scaler))
+        logger.debug(f"Data scaling step added to PreprocessorBuilder.")
         return self
 
     def build(self):
@@ -126,8 +137,6 @@ class Preprocessor:
     Preprocessor class for applying a sequence of preprocessing steps to the data.
     """
 
-    CorrelatedFeatureRemoval = 0
-
     def __init__(self, steps):
         """
         Initialize the Preprocessor with the specified preprocessing steps.
@@ -138,7 +147,7 @@ class Preprocessor:
         self.steps = steps
         logger.debug(f"Preprocessor initialized with {len(steps)} preprocessing steps.")
 
-    def preprocess_data(self, X, y=None, num_classes=None):
+    def transform(self, X, y=None):
         """
         Preprocess the input data by applying the specified preprocessing steps.
 
@@ -148,249 +157,42 @@ class Preprocessor:
             num_classes (int, optional): The number of unique classes. Required for one-hot encoding.
 
         Returns:
-            tuple: A tuple containing the preprocessed features (X) and labels (y).
+            tuple: A tuple containing the preprocessed features (X) labels (y), and label_mappings.
+                Label mappings is not returned if the LABEL_ENCODING step is not enabled.
         """
         logger.info("Starting data preprocessing...")
-        X = self.sanitize_column_names(X)
 
-        label_mappings = None  # to be set by encode_labels
+        label_mappings = None  # to be set by encoding steps
 
-        for step, params in self.steps:
-
+        for step, transformer in self.steps:
             if step == PreprocessorOptions.DATA_CLEANING:
                 logger.info("Cleaning data...")
-                X = params.clean_data(X)
+                X = transformer.clean_data(X)
+
+            elif step == PreprocessorOptions.COLUMN_SANITIZATION:
+                logger.info("Sanitizing column names...")
+                X = transformer.sanitize_column_names(X)
 
             elif step == PreprocessorOptions.CORRELATED_FEATURE_REMOVAL:
                 logger.info("Removing correlated features...")
-                X = params.remove_correlated_features(X)
+                X = transformer.remove_correlated_features(X)
 
             elif step == PreprocessorOptions.PCA:
                 logger.info("Applying PCA transformation...")
-                X = params.apply_pca(X)
+                X = transformer.apply_pca(X)
 
             elif step == PreprocessorOptions.DATA_SCALING:
                 logger.info("Applying data scaling...")
-                X = params.fit_transform(X)
+                X = transformer.fit_transform(X)
 
-            elif step == PreprocessorOptions.LABEL_ENCODING:
+            elif step == PreprocessorOptions.SPARSE_ENCODING:
                 logger.info("Applying label encoding...")
-                y_encoded, label_mappings = self.encode_labels(y, params)
+                y_encoded, label_mappings = transformer.encode_labels(y)
 
             elif step == PreprocessorOptions.ONE_HOT_ENCODING:
                 logger.info("Applying one-hot encoding...")
-                y_encoded = params.encode_labels(y_encoded, num_classes)
+                y_encoded, label_mappings = transformer.encode_labels(y)
 
         logger.info("Data preprocessing completed.")
-        return X, y_encoded, label_mappings
 
-    def encode_labels(self, y, label_encoder):
-        """
-        Encode the target labels using the specified label encoder.
-
-        Args:
-            y (pandas.Series): The target labels.
-            label_encoder (LabelEncoder): The label encoder instance.
-
-        Returns:
-            numpy.ndarray: The encoded labels.
-        """
-        logger.debug("Encoding labels...")
-        y_encoded = label_encoder.fit_transform(y)
-
-        # Print the mapping of original labels to encoded values
-        label_mapping = dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_)))
-        logger.debug(f"Label Mapping: {label_mapping}")
-
-        logger.debug("Label encoding completed.")
-        return y_encoded.ravel(), label_mapping
-
-    def sanitize_column_names(self, X):
-        """
-        Sanitize the column names of the input features.
-
-        Args:
-            X (pandas.DataFrame): The input features.
-
-        Returns:
-            pandas.DataFrame: The input features with sanitized column names.
-        """
-        logger.debug("Sanitizing column names...")
-
-        # Modify column names in place:
-        #   - Convert column names to lowercase
-        #   - Replace non-alphanumeric characters with underscores
-        #   - Strip leading and trailing whitespaces
-        X.columns = X.columns.str.strip().str.replace(' ', '_').str.replace('-', '_').str.lower()
-
-        logger.debug("Column names sanitized.")
-
-        # Return the modified DataFrame
-        return X
-
-class CorrelatedFeatureRemover:
-    """
-    Class for removing highly correlated features from the dataset.
-    """
-
-    def __init__(self, correlation_threshold=0.9):
-        """
-        Initialize the CorrelatedFeatureRemover with the specified correlation threshold.
-
-        Args:
-            correlation_threshold (float, optional): The threshold for determining highly correlated features.
-                Defaults to 0.9.
-        """
-        self.correlation_threshold = correlation_threshold
-        logger.debug(f"CorrelatedFeatureRemover initialized with threshold {correlation_threshold}.")
-    
-    def remove_correlated_features(self, X):
-        """
-        Remove highly correlated features from the dataset.
-
-        Args:
-            X (pandas.DataFrame): The input features.
-
-        Returns:
-            pandas.DataFrame: The dataset with selected features after removing highly correlated ones.
-        """
-        logger.debug("Removing correlated features...")
-        # Compute the correlation matrix
-        correlation_matrix = X.corr()
-        correlated_features = set()
-        
-        # Iterate over the upper triangle of the correlation matrix
-        for i in range(len(correlation_matrix.columns)):
-            for j in range(i):
-                if abs(correlation_matrix.iloc[i, j]) > self.correlation_threshold:
-                    colname = correlation_matrix.columns[i]
-                    correlated_features.add(colname)
-        
-        # Drop the correlated features from the dataset
-        selected_features = X.columns.drop(correlated_features)
-        X_selected = X[selected_features]
-        
-        logger.debug(f"Removed {len(correlated_features)} correlated features.")
-        return X_selected
-
-
-class PCATransformer:
-    """
-    Class for applying PCA transformation to the dataset.
-    """
-
-    def __init__(self, pca_variance_ratio=0.95):
-        """
-        Initialize the PCATransformer with the specified variance ratio.
-
-        Args:
-            pca_variance_ratio (float, optional): The desired amount of variance to retain in the PCA transformation.
-                Defaults to 0.95.
-        """
-        self.pca_variance_ratio = pca_variance_ratio
-        self.scaler = StandardScaler()
-        self.pca = PCA(n_components=pca_variance_ratio)
-        logger.debug(f"PCATransformer initialized with variance ratio {pca_variance_ratio}.")
-    
-    def apply_pca(self, X):
-        """
-        Apply PCA transformation to the dataset.
-
-        Args:
-            X (pandas.DataFrame): The input features.
-
-        Returns:
-            numpy.ndarray: The transformed dataset after applying PCA.
-        """
-        logger.debug("Applying PCA transformation...")
-        # Scale the data
-        X_scaled = self.scaler.fit_transform(X)
-        
-        # Apply PCA transformation
-        X_pca = self.pca.fit_transform(X_scaled)
-        
-        logger.debug(f"PCA transformation applied. Transformed dataset shape: {X_pca.shape}")
-        return X_pca
-
-
-class DataCleaner:
-    """
-    Class for cleaning the dataset by handling infinite and NaN values.
-    """
-
-    def __init__(self, fill_method='median'):
-        """
-        Initialize the DataCleaner with the specified fill method.
-
-        Args:
-            fill_method (str, optional): The method for filling infinite and NaN values.
-                Supported values: 'median', 'mean', or any other value. Defaults to 'median'.
-        """
-        self.fill_method = fill_method
-        logger.debug(f"DataCleaner initialized with fill method '{fill_method}'.")
-
-    def clean_data(self, data):
-        """
-        Clean the dataset by handling infinite and NaN values.
-
-        Args:
-            data (pandas.DataFrame): The input dataset.
-
-        Returns:
-            pandas.DataFrame: The cleaned dataset with infinite and NaN values handled.
-        """
-        logger.debug("Cleaning data...")
-
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError(f"Expected a pandas DataFrame, but got {type(data)} instead.")
-
-        # Replace infinite values with NaN using pandas methods
-        data.replace([np.inf, -np.inf], np.nan, inplace=True)
-
-        # Check and fill NaN values based on the selected fill method
-        for column in data.columns:
-            if data[column].isnull().any():  # Check if there are any NaN values in the column
-                if self.fill_method == 'median':
-                    fill_value = data[column].median()
-                elif self.fill_method == 'mean':
-                    fill_value = data[column].mean()
-                elif self.fill_method == 'zero':
-                    fill_value = 0
-                else:
-                    # Assuming self.fill_method is a callable that returns a scalar
-                    # This path needs specific handling based on what self.fill_method is
-                    fill_value = self.fill_method(data[column])
-
-                # Assign the result of fillna directly to the DataFrame column
-                data[column] = data[column].fillna(fill_value)
-
-        logger.debug("Data cleaning completed.")
-        return data
-
-
-class OneHotEncoder:
-    """
-    Class for one-hot encoding the target labels.
-    """
-
-    def __init__(self):
-        """
-        Initialize the OneHotEncoder.
-        """
-        logger.debug("OneHotEncoder initialized.")
-
-    def encode_labels(self, y, num_classes):
-        """
-        One-hot encode the target labels.
-
-        Args:
-            y (numpy.ndarray): The target labels.
-            num_classes (int): The number of unique classes.
-
-        Returns:
-            numpy.ndarray: The one-hot encoded labels.
-        """
-        logger.debug("One-hot encoding labels...")
-        y_one_hot = to_categorical(y, num_classes=num_classes)
-        logger.debug("One-hot encoding completed.")
-        return y_one_hot
+        return (X, y_encoded, label_mappings) if label_mappings else X

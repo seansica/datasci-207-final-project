@@ -1,11 +1,9 @@
 # pipelines/logistic_regression_pipeline.py
 import json
 import os
-from sklearn.preprocessing import StandardScaler
 
 from .base_pipeline import BasePipeline
 from ..utils.evaluation import SKLearnEvaluator
-from ..data.data_loader import DataLoader
 from ..preprocessing.preprocessor import PreprocessorBuilder
 from ..models.logistic_regression import LogisticRegressionModel
 from ..utils.logger import init_logger
@@ -56,18 +54,6 @@ class LogisticRegressionPipeline(BasePipeline):
         with open(os.path.join(self.pipeline_dir, "pipeline_details.json"), "w") as f:
             json.dump(pipeline_details, f)
 
-        # data_loader, X_preprocessed, y_encoded, label_mappings = self.preprocess_data()
-
-        data_loader = DataLoader(self.dataset_file_paths)
-        logger.debug("DataLoader created.")
-
-        all_data = data_loader.load_data(self.train_fraction)
-        logger.info(f"Data loaded. Shape: {all_data.shape}")
-
-        X = all_data.drop(columns=[" Label"])
-        y = all_data[" Label"]
-        logger.debug("Features (X) and labels (y) extracted from the loaded data.")
-
         preprocessor = (
             PreprocessorBuilder()
             .with_data_cleaning(fill_method="median")
@@ -75,19 +61,14 @@ class LogisticRegressionPipeline(BasePipeline):
                 correlation_threshold=self.correlation_threshold
             )
             .with_pca(pca_variance_ratio=self.pca_variance_ratio)
-            .with_data_scaling(scaler=StandardScaler())
-            .with_label_encoding()
+            .with_sparse_encoding()
             # .with_one_hot_encoding()
             .build()
         )
-        logger.debug(
-            "Preprocessor built with data cleaning, correlated feature removal, PCA, and label encoding."
-        )
 
-        X_preprocessed, y_encoded, label_mappings = preprocessor.preprocess_data(X, y)
-        # y_encoded = y_encoded_tuple[0]
-        logger.info(
-            f"Data preprocessing completed. Preprocessed features shape: {X_preprocessed.shape}"
+        # Load and process the data
+        data_loader, X_preprocessed, y_encoded, label_mappings = self.initialize(
+            preprocessor=preprocessor
         )
 
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = data_loader.split_data(
