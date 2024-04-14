@@ -10,7 +10,7 @@ from ..preprocessing.preprocessor import PreprocessorBuilder
 from ..models.logistic_regression import LogisticRegressionModel
 from ..utils.logger import init_logger
 
-logger = init_logger("logistic_regression_pipeline_logger")
+logger = init_logger(__name__)
 
 
 class LogisticRegressionPipeline(BasePipeline):

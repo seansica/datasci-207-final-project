@@ -7,7 +7,7 @@ from sklearn.model_selection import GridSearchCV
 
 from ..utils.logger import init_logger
 
-logger = init_logger("random_forest_logger")
+logger = init_logger(__name__)
 
 
 class RandomForest:

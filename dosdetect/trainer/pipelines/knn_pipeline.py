@@ -8,7 +8,7 @@ from .base_pipeline import BasePipeline
 from ..models.knn import KNN
 from ..utils.logger import init_logger
 
-logger = init_logger("knn_pipeline_logger")
+logger = init_logger(__name__)
 
 
 class KNNPipeline(BasePipeline):

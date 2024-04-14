@@ -9,7 +9,7 @@ from ..models.bilstm_cnn import BiLSTMCNN
 from ..utils.evaluation import KerasEvaluator, SKLearnEvaluator
 from ..utils.logger import init_logger
 
-logger = init_logger("bilstm_cnn_pipeline_logger")
+logger = init_logger(__name__)
 
 
 class BiLSTMCNNPipeline(BasePipeline):

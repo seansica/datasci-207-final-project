@@ -4,7 +4,7 @@ from ..data.data_loader import DataLoader
 from ..preprocessing.preprocessor import PreprocessorBuilder
 from ..utils.logger import init_logger
 
-logger = init_logger("base_pipeline_logger")
+logger = init_logger(__name__)
 
 
 class BasePipeline:

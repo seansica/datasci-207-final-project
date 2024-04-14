@@ -1,10 +1,9 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-import logging
 from ..utils.logger import init_logger
 
-logger = init_logger("data_loader_logger")
+logger = init_logger(__name__)
 
 
 class DataLoader:

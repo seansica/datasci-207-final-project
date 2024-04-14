@@ -9,7 +9,7 @@ from kerastuner import HyperParameters, RandomSearch
 
 from ..utils.logger import init_logger
 
-logger = init_logger("bilstm_cnn_logger")
+logger = init_logger(__name__)
 
 
 class BiLSTMCNN:

@@ -18,7 +18,7 @@ import json
 
 from ..utils.logger import init_logger
 
-logger = init_logger("evaluator_logger")
+logger = init_logger(__name__)
 
 
 class BaseEvaluator:

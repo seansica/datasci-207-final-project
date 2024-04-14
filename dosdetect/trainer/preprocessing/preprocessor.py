@@ -8,8 +8,7 @@ import re
 import logging
 from ..utils.logger import init_logger
 
-
-logger = init_logger("preprocessor_logger")
+logger = init_logger(__name__)
 
 
 class PreprocessorOptions(Enum):

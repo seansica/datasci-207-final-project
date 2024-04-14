@@ -8,7 +8,7 @@ from .base_pipeline import BasePipeline
 from ..models.random_forest import RandomForest
 from ..utils.logger import init_logger
 
-logger = init_logger("random_forest_pipeline_logger")
+logger = init_logger(__name__)
 
 
 class RandomForestPipeline(BasePipeline):

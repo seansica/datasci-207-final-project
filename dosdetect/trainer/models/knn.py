@@ -9,8 +9,7 @@ from sklearn.model_selection import GridSearchCV
 
 from ..utils.logger import init_logger
 
-logger = init_logger("knn_logger")
-
+logger = init_logger(__name__)
 
 class KNN:
     """
