@@ -206,14 +206,18 @@ class BiLSTMCNN:
         companion_filename = f"hyperparameters.json"
         companion_path = os.path.join(output_dir, companion_filename)
         model_config = {
-            "input_shape": self.input_shape,
+            "input_shape": list(
+                self.input_shape
+            ),  # convert tuple to list for serialization
             "num_classes": self.num_classes,
             "optimizer": self.model.optimizer.get_config(),
             "loss": self.model.loss,
             "metrics": self.model.metrics_names,
         }
         with open(companion_path, "w") as file:
-            json.dump(model_config, file, indent=4)
+            json.dump(
+                model_config, file, indent=4, default=lambda x: str(x)
+            )  # Convert non-serializable objects to strings
 
         logger.info(f"BiLSTM-CNN model saved to {model_path}")
         logger.info(f"Model configuration saved to {companion_path}")
