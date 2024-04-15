@@ -48,13 +48,7 @@ class BiLSTMCNN:
         # Create the model architecture
         model = tf.keras.Sequential()
 
-        # Input layer
-        model.add(tf.keras.layers.InputLayer(shape=self.input_shape))
-
-        # TODO Attention layer
-        # model.add(Attention(use_scale=True))
-
-        # Bidirectional LSTM layers
+        # First layer with input_shape
         model.add(
             Bidirectional(
                 LSTM(
@@ -64,7 +58,8 @@ class BiLSTMCNN:
                         else 128
                     ),
                     return_sequences=True,
-                )
+                ),
+                input_shape=self.input_shape,
             )
         )
         model.add(
