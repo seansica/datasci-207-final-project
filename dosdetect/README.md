@@ -18,3 +18,47 @@ Alternatively, you can build a wheel distribution of the package and then instal
 python setup.py bdist_wheel
 pip install dist/*.whl
 ```
+
+## Usage
+
+After installation, you can execute the 'dosdetect' tool using the `dosdetect` command in your terminal. 
+
+To see a list of supported arguments, you can pass the `--help` flag:
+
+```bash
+dosdetect --help
+```
+
+Key flags include:
+
+- **`--dataset`**: This flag allows users to specify the path to the CIC-IDS2017 dataset, making the application adaptable to other sequential CSV datasets with a 'Label' classification feature.
+- **`--train-fraction`**: Users can train the model on a subset of the original dataset, which proves invaluable during initial development and debugging phases.
+- **`--log-dir`** and **`--model-dir`**: These flags are used to designate directories for storing logs, exported files (such as model parameters in .keras and .pkl formats), evaluated performances, and model details. By default, all pipelines create a unique directory within `~/.dosdetect` appended with a timestamp suffix.
+
+The CLI further supports individual model configurations through additional flags specific to each model type:
+
+| Argument                                      | Default Value   | Description                                                                                |
+| --------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `--auto-tune`                                 | False           | Use KerasTuner for automatic hyperparameter tuning                                         |
+| `--dataset`                                   | Path to dataset | Choose the path to your dataset/training files                                             |
+| `--train-fraction`                            | 1.0             | Train the model on a fraction of the training dataset to speed up training                 |
+| `--pipeline`                                  | "bilstm-cnn"    | Choose the pipeline to run: "knn", "bilstm-cnn", "random-forest", or "logistic-regression" |
+| `--log-dir`                                   | "~/.dosdetect"  | Directory to store log files                                                               |
+| `--model-dir`                                 | "~/.dosdetect"  | Directory to save trained models                                                           |
+| `--knn-correlation-threshold`                 | 0.9             | Correlation threshold for KNN pipeline                                                     |
+| `--knn-pca-variance-ratio`                    | 0.95            | PCA variance ratio for KNN pipeline                                                        |
+| `--knn-n-neighbors`                           | 5               | Number of neighbors for KNN pipeline                                                       |
+| `--bilstm-cnn-correlation-threshold`          | 0.9             | Correlation threshold for BiLSTM-CNN pipeline                                              |
+| `--bilstm-cnn-pca-variance-ratio`             | 0.95            | PCA variance ratio for BiLSTM-CNN pipeline                                                 |
+| `--bilstm-cnn-epochs`                         | 10              | Number of epochs for BiLSTM-CNN pipeline                                                   |
+| `--bilstm-cnn-batch-size`                     | 32              | Batch size for BiLSTM-CNN pipeline                                                         |
+| `--random-forest-correlation-threshold`       | 0.9             | Correlation threshold for Random Forest pipeline                                           |
+| `--random-forest-pca-variance-ratio`          | 0.95            | PCA variance ratio for Random Forest pipeline                                              |
+| `--random-forest-n-estimators`                | 100             | Number of estimators for Random Forest pipeline                                            |
+| `--random-forest-max-depth`                   | None            | Maximum depth for Random Forest pipeline                                                   |
+| `--random-forest-random-state`                | None            | Random state for Random Forest pipeline                                                    |
+| `--logistic-regression-correlation-threshold` | 0.9             | Correlation threshold for Logistic Regression pipeline                                     |
+| `--logistic-regression-pca-variance-ratio`    | 0.95            | PCA variance ratio for Logistic Regression pipeline                                        |
+| `--logistic-regression-C`                     | 1.0             | Inverse of regularization strength for Logistic Regression pipeline                        |
+| `--logistic-regression-max-iter`              | 100             | Maximum number of iterations for Logistic Regression pipeline                              |
+| `--logistic-regression-random-state`          | None            | Random state for Logistic Regression pipeline                                              |
