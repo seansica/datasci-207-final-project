@@ -225,3 +225,5 @@ pyvenv.cfg
 pip-selfcheck.json
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,virtualenv
+dosdetect-trainer/CICIDS2017/Thursday-WorkingHours.pcap
+papers/Transactions on Emerging Telecommunications Technologies - 2023 - Priyadarshini - SDN and application layer DDoS attacks.pdf
