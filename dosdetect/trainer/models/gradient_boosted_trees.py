@@ -1,4 +1,3 @@
-from datetime import datetime
 import os
 import json
 import logging
@@ -52,13 +51,13 @@ class GradientBoostedTreesModel:
         dense = Dense(1, activation='linear')(input_layer)
 
         # Create the XGBoost model
-        self.xgb_model = xgb.XGBRegressor(
+        self.xgb_model = xgb.XGBClassifier(
             max_depth=max_depth,
             learning_rate=learning_rate,
             n_estimators=n_estimators,
-            objective="multi:softprob",
+            objective="multi:softmax",  # Change the objective to 'multi:softmax'
             num_class=self.num_classes,
-            tree_method="gpu_hist" if xgb.train.is_gpu_support_enabled() else "auto",
+            tree_method="auto",
         )
 
         # Wrap the XGBoost model in a Keras model
