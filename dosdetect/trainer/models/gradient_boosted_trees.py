@@ -56,9 +56,9 @@ class GradientBoostedTreesModel:
             max_depth=max_depth,
             learning_rate=learning_rate,
             n_estimators=n_estimators,
-            objective='multi:softprob',
+            objective="multi:softprob",
             num_class=self.num_classes,
-            tree_method='gpu_hist' if xgb.cuda.is_available() else 'auto',
+            tree_method="auto",
         )
 
         # Wrap the XGBoost model in a Keras model
