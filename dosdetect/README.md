@@ -1,5 +1,3 @@
-Got it, here's the updated README documentation with the markdown table for the flags:
-
 # DosDetect
 
 The 'dosdetect' package can be installed with pip and interacted with using a command-line interface (CLI). The CLI provides 47 configurable flags to customize the pipeline according to your needs.
