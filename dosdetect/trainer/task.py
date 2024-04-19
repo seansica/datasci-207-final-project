@@ -50,9 +50,11 @@ def parse_arguments():
             "random-forest",
             "logistic-regression",
             "gradient-boosted-trees",
+            "gru",
+            "decision-tree",
             "ffnn",
         ],
-        help='Choose the pipeline to run: "knn", "bilstm-cnn", "random-forest", "logistic-regression", "gradient-boosted-trees", or "ffnn" (default: "bilstm-cnn")',
+        help='Choose the pipeline to run: "knn", "bilstm-cnn", "random-forest", "logistic-regression", "gradient-boosted-trees", "gru", "decision-tree", or "ffnn" (default: "bilstm-cnn")',
     )
     parser.add_argument(
         "--log-dir",
