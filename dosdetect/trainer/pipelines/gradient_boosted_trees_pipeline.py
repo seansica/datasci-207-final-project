@@ -59,7 +59,7 @@ class GradientBoostedTreesPipeline(BasePipeline):
                 correlation_threshold=self.correlation_threshold
             )
             .with_pca(pca_variance_ratio=self.pca_variance_ratio)
-            .with_one_hot_encoding()
+            .with_sparse_encoding()
             .build()
         )
 
