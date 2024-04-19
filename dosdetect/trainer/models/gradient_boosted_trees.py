@@ -122,7 +122,6 @@ class GradientBoostedTreesModel:
             "learning_rate": self.xgb_model.learning_rate,
             "n_estimators": self.xgb_model.n_estimators,
             "objective": self.xgb_model.objective,
-            "num_class": self.xgb_model.num_class,
             "tree_method": self.xgb_model.tree_method,
         }
         with open(companion_path, "w") as file:
