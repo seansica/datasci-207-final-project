@@ -43,7 +43,9 @@ Given this context, the null flow_bytes/s values *appear* to be a natural conseq
 
 The research paper accompanying the CIC-IDS2017 dataset was reviewed before making a final determination. The paper states that Flow Inter arrival time (IAT) related features such as Min, Mean, Max and also the Flow Duration are the best common features for DoS detection. Notably, for DDoS attack, backward packet length, average packet size and some inter arrival time related features are heavily influential features.
 
-![Flow Durations](images/flow_duration.png)
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center', fig.cap="Flow Duration Boxplot"}
+knitr::include_graphics("images/flow_duration.png")
+```
 
 Here are some observations and potential insights based on the boxplot:
 
@@ -110,8 +112,10 @@ After the EDA phase, primitive baseline models were run to set benchmarks for th
 * K-Nearest Neighbors (KNN) 
 * Random Forest 
 * Logistic Regression
-
-The model predictions for KNN and Random Forest were surprisingly accurate, although their generalizability was likely less robust than the Bi-LSTM-CNN model. Training the models on the entire CIC-IDS2017 dataset was found to be unfeasible on consumer hardware (Apple M1 Pro and M3 Pro were specifically tested); the dataset had to be reduced by a factor of 5-10 to achieve training convergence in a reasonable amount of time.
+* Decision Tree
+* Gradient Boosted Decision Tree
+* Feed-Forward Neural Network (FFNN)
+* Gated Recurrent Unit (GRU)
 
 ### Pipeline Scaffolding
 
@@ -128,17 +132,34 @@ Key flags include:
 The CLI further supports individual model configurations through additional flags specific to each model type:
 
 - **Bi-LSTM-CNN Hyperparameters**:
-  - Correlation threshold and PCA variance ratio are settable with defaults of 0.9 and 0.95, respectively, to control data preprocessing.
-  - The number of epochs and batch size for training are customizable, with defaults of 10 epochs and a batch size of 32.
+    - Correlation threshold and PCA variance ratio are settable with defaults of 0.9 and 0.95, respectively, to control data preprocessing.
+    - The number of epochs and batch size for training are customizable, with defaults of 10 epochs and a batch size of 32.
 
 - **Random Forest Hyperparameters**:
-  - Similar to Bi-LSTM-CNN, settings for correlation threshold and PCA variance ratio are provided.
-  - The model configuration can be finely tuned with parameters like the number of estimators, maximum depth (with a default of `None` indicating unlimited growth of trees), and a random state.
+    - Similar to Bi-LSTM-CNN, settings for correlation threshold and PCA variance ratio are provided.
+    - The model configuration can be finely tuned with parameters like the number of estimators, maximum depth (with a default of `None` indicating unlimited growth of trees), and a random state.
 
 - **Logistic Regression Hyperparameters**:
-  - This model also uses correlation threshold and PCA variance ratio settings.
-  - Parameters such as inverse of regularization strength (`C`), maximum number of iterations, and random state enhance the flexibility in model training and regularization strength to prevent overfitting.
+    - This model also uses correlation threshold and PCA variance ratio settings.
+    - Parameters such as inverse of regularization strength (`C`), maximum number of iterations, and random state enhance the flexibility in model training and regularization strength to prevent overfitting.
 
+- **Decision Tree Hyperparameters**:
+    - Correlation threshold and PCA variance ratio settings are provided for data preprocessing.
+    - The maximum depth of the tree, minimum number of samples required to split an internal node, minimum number of samples required to be at a leaf node, and the criterion for measuring the quality of a split (e.g., Gini impurity or entropy) can be configured.
+
+- **Gradient Boosted Decision Tree Hyperparameters**:
+    - Correlation threshold and PCA variance ratio settings control data preprocessing.
+    - The maximum depth of the individual trees, learning rate for boosting, and the number of estimators (trees) can be specified, with defaults of 3 for max depth, 0.1 for learning rate, and 100 estimators.
+
+- **FFNN Hyperparameters**:
+    - Like other models, correlation threshold and PCA variance ratio settings are available.
+    - The number of hidden units, dropout rate, and hidden layers can be customized, with defaults of 128 hidden units, 0.2 dropout rate, and 2 hidden layers.
+    - The epochs and batch size for training are also configurable, with defaults of 10 epochs and a batch size of 32.
+
+- **GRU Hyperparameters**:
+    - Correlation threshold and PCA variance ratio settings control data preprocessing.
+    - The number of GRU units, dropout rate, epochs, and batch size can be specified, with defaults of 128 units, 0.2 dropout rate, 10 epochs, and a batch size of 32.
+    
 Each of these flags is designed to provide granular control over the training and evaluation processes, ensuring that the models can be optimally configured for the best possible performance on the tasks at hand.
 
 ### Bi-LSTM Model Architecture
@@ -169,11 +190,15 @@ This Bi-LSTM-CNN model combines the strengths of recurrent neural networks (Bi-L
 
 ### Pipeline Diagram
 
-![Bi-LSTM-CNN Pipeline Workflow](images/bilstm-cnn-block-diagram.png)
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center', fig.cap="Training Pipeline"}
+knitr::include_graphics("images/bilstm-cnn-block-diagram.png")
+```
 
 ### Model Diagram
 
-![Bi-LSTM-CNN Model Diagram](images/bilstm-cnn-model-diagram.png)
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center', fig.cap="Bidirectional LSTM-CNN Model Architecture"}
+knitr::include_graphics("images/bilstm-cnn-model-diagram.png")
+```
 
 ### Datasets
 
@@ -341,6 +366,111 @@ The Random Forest model demonstrated strong performance across various classes, 
 | 13 (Web Attack: Sql Injection) | 100.00%  | 50.00%    | 14.29%  | 22.22%   |
 | 14 (Web Attack: XSS)           | 99.97%   | 47.17%    | 33.11%  | 38.91%   |
 
+#### Decision Tree Results
+
+The Decision Tree model's evaluation pipeline commenced on April 19, 2024, at 02:04:58 and concluded at 02:11:58, spanning a total duration of approximately 7 minutes. The pipeline configuration did not utilize auto-tuning and engaged the entire dataset (train fraction set to 1.0), with a correlation threshold of 0.9 and a principal component analysis (PCA) variance ratio of 0.95. The model hyperparameters were set to allow unlimited depth growth, with a minimum of 2 samples required to split an internal node and a minimum of 1 sample required to be at a leaf node. The criterion used for measuring the quality of splits was the Gini impurity index.
+
+The Decision Tree model demonstrated strong performance across various classes, particularly excelling in identifying benign traffic, DDoS, DoS Hulk, and FTP-Patator attacks with high accuracy, precision, recall, and F1 scores. The detailed performance metrics are presented in the following table:
+
+| Class                      | Accuracy  | Precision | Recall   | F1 Score | AUC      |
+|----------------------------|-----------|-----------|----------|----------|----------|
+| BENIGN                     | 99.75%    | 99.86%    | 99.83%   | 99.84%   | 99.63%   |
+| Bot                        | 99.95%    | 63.16%    | 62.22%   | 62.69%   | 81.10%   |
+| DDoS                       | 99.99%    | 99.86%    | 99.92%   | 99.89%   | 99.96%   |
+| DoS GoldenEye              | 99.98%    | 96.60%    | 97.24%   | 96.92%   | 98.62%   |
+| DoS Hulk                   | 99.96%    | 99.72%    | 99.80%   | 99.76%   | 99.90%   |
+| DoS Slowhttptest           | 99.99%    | 97.64%    | 98.41%   | 98.02%   | 99.20%   |
+| DoS slowloris              | 99.99%    | 98.78%    | 97.50%   | 98.13%   | 98.75%   |
+| FTP-Patator                | 100.00%   | 99.51%    | 99.88%   | 99.69%   | 99.94%   |
+| Heartbleed                 | 100.00%   | 100.00%   | 20.00%   | 33.33%   | 60.00%   |
+| Infiltration               | 100.00%   | 14.29%    | 16.67%   | 15.38%   | 58.33%   |
+| PortScan                   | 99.87%    | 98.84%    | 98.86%   | 98.85%   | 99.52%   |
+| SSH-Patator                | 99.99%    | 98.41%    | 99.16%   | 98.78%   | 99.58%   |
+| Web Attack – Brute Force   | 99.97%    | 71.77%    | 75.39%   | 73.54%   | 87.69%   |
+| Web Attack – Sql Injection | 100.00%   | 20.00%    | 14.29%   | 16.67%   | 57.14%   |
+| Web Attack – XSS           | 99.97%    | 42.65%    | 38.41%   | 40.42%   | 69.20%   |
+
+The Decision Tree model exhibited a high level of accuracy, with perfect scores in identifying certain attack types like FTP-Patator and Heartbleed. It also showed excellent precision and recall for classes like BENIGN, DDoS, DoS Hulk, and DoS Slowhttptest. However, the model struggled with some classes, such as Infiltration, Web Attack – Sql Injection, and Web Attack – XSS, where precision, recall, and F1 scores were relatively lower.
+
+#### Gradient Boosted Decision Tree Results
+
+The Gradient Boosted Decision Tree model's evaluation pipeline commenced on April 19, 2024, at 03:29:28 and concluded at 03:31:57, spanning a total duration of approximately 2 minutes and 29 seconds. The pipeline configuration did not utilize auto-tuning and engaged the entire dataset (train fraction set to 1.0), with a correlation threshold of 0.9 and a principal component analysis (PCA) variance ratio of 0.95. The model hyperparameters were set with a maximum depth of 3, a learning rate of 0.1, and 100 estimators. The objective function used was 'multi:softmax' for multi-class classification, and the tree method was set to 'auto'.
+
+The Gradient Boosted Decision Tree model demonstrated varying performance across different classes, with notable strengths in identifying benign traffic, DDoS, and DoS Hulk attacks, but relatively weaker performance in classifying certain attack types like Web Attack – Brute Force, Web Attack – Sql Injection, and Web Attack – XSS. The detailed performance metrics are presented in the following table:
+
+| Class                         | Accuracy  | Precision | Recall   | F1 Score |
+|-------------------------------|-----------|-----------|----------|----------|
+| BENIGN                        | 98.44%    | 99.13%    | 98.93%   | 99.03%   |
+| Bot                           | 99.95%    | 100.00%   | 27.65%   | 43.33%   |
+| DDoS                          | 99.95%    | 99.43%    | 99.39%   | 99.41%   |
+| DoS GoldenEye                 | 99.91%    | 94.23%    | 81.56%   | 87.44%   |
+| DoS Hulk                      | 99.66%    | 97.51%    | 98.35%   | 97.93%   |
+| DoS Slowhttptest              | 99.95%    | 91.24%    | 84.48%   | 87.73%   |
+| DoS slowloris                 | 99.97%    | 99.10%    | 85.66%   | 91.89%   |
+| FTP-Patator                   | 99.99%    | 99.68%    | 97.53%   | 98.59%   |
+| Heartbleed                    | 100.00%   | 100.00%   | 80.00%   | 88.89%   |
+| Infiltration                  | 100.00%   | 50.00%    | 16.67%   | 25.00%   |
+| PortScan                      | 99.07%    | 89.45%    | 94.47%   | 91.89%   |
+| SSH-Patator                   | 99.99%    | 97.11%    | 96.45%   | 96.78%   |
+| Web Attack – Brute Force      | 99.95%    | 62.03%    | 15.46%   | 24.75%   |
+| Web Attack – Sql Injection    | 100.00%   | 0.00%     | 0.00%    | 0.00%    |
+| Web Attack – XSS              | 99.97%    | 0.00%     | 0.00%    | 0.00%    |
+
+The Gradient Boosted Decision Tree model achieved high accuracy scores for most classes, with perfect accuracy for classes like Heartbleed and Web Attack – Sql Injection. It also demonstrated excellent precision for classes such as BENIGN, Bot, DDoS, and FTP-Patator. However, the model struggled with recall and F1 scores for certain attack types, particularly Web Attack – Brute Force, Web Attack – Sql Injection, and Web Attack – XSS.
+
+#### FFNN Results
+
+The FFNN model's evaluation pipeline commenced on April 19, 2024, at 02:00:31 and concluded at 02:32:57, spanning a total duration of approximately 32 minutes and 26 seconds. The pipeline configuration did not utilize auto-tuning and engaged the entire dataset (train fraction set to 1.0), with a correlation threshold of 0.9 and a principal component analysis (PCA) variance ratio of 0.95. The model hyperparameters were set with 128 hidden units, a dropout rate of 0.2, 2 hidden layers, 10 epochs, and a batch size of 32. The optimizer used was Adam, with a learning rate of 0.001, and the loss function was categorical cross-entropy.
+
+The FFNN model demonstrated varying performance across different classes, with notable strengths in identifying benign traffic, DDoS, and DoS Hulk attacks, but relatively weaker performance in classifying certain attack types like Web Attack – Brute Force, Web Attack – Sql Injection, and Web Attack – XSS. The detailed performance metrics are presented in the following table:
+
+| Class                      | Accuracy  | Precision | Recall   | F1 Score |
+|----------------------------|-----------|-----------|----------|----------|
+| BENIGN                     | 98.20%    | 99.01%    | 98.75%   | 98.88%   |
+| Bot                        | 99.95%    | 100.00%   | 33.09%   | 49.72%   |
+| DDoS                       | 99.91%    | 99.85%    | 98.20%   | 99.02%   |
+| DoS GoldenEye              | 99.95%    | 93.30%    | 94.68%   | 93.98%   |
+| DoS Hulk                   | 99.41%    | 95.77%    | 97.07%   | 96.42%   |
+| DoS Slowhttptest           | 99.95%    | 84.44%    | 90.92%   | 87.56%   |
+| DoS slowloris              | 99.97%    | 94.65%    | 90.16%   | 92.35%   |
+| FTP-Patator                | 99.98%    | 95.62%    | 98.58%   | 97.08%   |
+| Heartbleed                 | 100.00%   | 0.00%     | 0.00%    | 0.00%    |
+| Infiltration               | 100.00%   | 0.00%     | 0.00%    | 0.00%    |
+| PortScan                   | 99.10%    | 89.99%    | 94.38%   | 92.13%   |
+| SSH-Patator                | 99.98%    | 91.25%    | 97.80%   | 94.42%   |
+| Web Attack – Brute Force   | 99.95%    | 76.92%    | 3.15%    | 6.06%    |
+| Web Attack – Sql Injection | 100.00%   | 0.00%     | 0.00%    | 0.00%    |
+| Web Attack – XSS           | 99.97%    | 0.00%     | 0.00%    | 0.00%    |
+
+The FFNN model achieved high accuracy scores for most classes, with perfect accuracy for classes like Heartbleed, Infiltration, and Web Attack – Sql Injection. It also demonstrated excellent precision for classes such as BENIGN, Bot, and DDoS. However, the model struggled with recall and F1 scores for certain attack types, particularly Web Attack – Brute Force, Web Attack – Sql Injection, Web Attack – XSS, and Infiltration.
+
+#### GRU Results
+
+The GRU model's evaluation pipeline commenced on April 19, 2024, at 03:30:12 and concluded at 04:14:43, spanning a total duration of approximately 44 minutes and 31 seconds. The pipeline configuration did not utilize auto-tuning and engaged the entire dataset (train fraction set to 1.0), with a correlation threshold of 0.9 and a principal component analysis (PCA) variance ratio of 0.95. The model hyperparameters were set with 128 units, no dropout, 10 epochs, and a batch size of 32. The optimizer used was Adam, with a learning rate of 0.001, and the loss function was categorical cross-entropy.
+
+The GRU model demonstrated strong performance in identifying benign traffic, DDoS attacks, and DoS Hulk attacks, with high accuracy, precision, recall, and F1 scores for these classes. However, it struggled with certain attack types, particularly Web Attack – Brute Force, Web Attack – Sql Injection, Web Attack – XSS, and Heartbleed, where it achieved very low or zero recall and F1 scores. The detailed performance metrics are presented in the following table:
+
+| Class                          | Accuracy  | Precision | Recall   | F1 Score |
+| ---------------------------    | --------- | --------- | -------- | -------- |
+| BENIGN                         | 98.30%    | 99.19%    | 98.69%   | 98.94%   |
+| Bot                            | 99.95%    | 100.00%   | 33.09%   | 49.72%   |
+| DDoS                           | 99.98%    | 99.73%    | 99.80%   | 99.77%   |
+| DoS GoldenEye                  | 99.94%    | 91.66%    | 92.44%   | 92.05%   |
+| DoS Hulk                       | 99.59%    | 96.12%    | 98.96%   | 97.52%   |
+| DoS Slowhttptest               | 99.93%    | 79.41%    | 90.83%   | 84.74%   |
+| DoS slowloris                  | 99.95%    | 88.60%    | 85.23%   | 86.88%   |
+| FTP-Patator                    | 99.89%    | 72.24%    | 98.33%   | 83.30%   |
+| Heartbleed                     | 100.00%   | 0.00%     | 0.00%    | 0.00%    |
+| Infiltration                   | 100.00%   | 100.00%   | 16.67%   | 28.57%   |
+| PortScan                       | 99.08%    | 90.64%    | 93.15%   | 91.88%   |
+| SSH-Patator                    | 99.97%    | 90.45%    | 97.64%   | 93.91%   |
+| Web Attack – Brute Force       | 99.95%    | 100.00%   | 3.15%    | 6.12%    |
+| Web Attack – Sql Injection     | 100.00%   | 0.00%     | 0.00%    | 0.00%    |
+| Web Attack – XSS               | 99.97%    | 0.00%     | 0.00%    | 0.00%    |
+
+The model also exhibited relatively lower performance for classes like Bot, DoS Slowhttptest, and DoS slowloris, with reasonable accuracy but lower precision, recall, or F1 scores compared to the top-performing classes.
+
+Overall, while the GRU model excelled in detecting some attack types, it faced challenges in accurately classifying instances of less represented or more complex attack classes, which could potentially be addressed through techniques like data augmentation, feature engineering, or ensemble methods.
 
 ## Results
 
@@ -353,19 +483,49 @@ knitr::include_graphics("bilstm_cnn_loss_curve.png")
 knitr::include_graphics("bilstm_cnn_accuracy_curve.png")
 ```
 
-![Confusion Matrix - Bi-LSTM-CNN](images/confusion_matrix/bilstm_cnn_confusion_matrix.png)
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center'}
+knitr::include_graphics("images/confusion_matrix/bilstm_cnn_confusion_matrix.png")
+```
 
 **KNN Model:** The KNN model displayed excellent accuracy and was particularly effective for detecting major attack types like DDoS and Dos Hulk with high precision and recall. However, it fell short in detecting more complex or less frequent attack types such as SQL Injection and XSS attacks, where it exhibited very low recall rates. This indicates that while KNN is robust for more straightforward classification tasks, its performance degrades without features that distinctly separate all classes in the multi-dimensional feature space.
 
-![Confusion Matrix - KNN](images/confusion_matrix/knn_confusion_matrix.png)
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center'}
+knitr::include_graphics("images/confusion_matrix/knn_confusion_matrix.png")
+```
 
 **Random Forest Model:** This model achieved impressive results across most categories, with particularly strong performance in identifying benign traffic and several types of DDoS attacks. The ensemble nature of Random Forest, which combines decisions from multiple decision trees, helps in reducing overfitting and improving the generalizability across diverse attack vectors. However, similar to the Bi-LSTM-CNN, it demonstrated weaknesses in identifying infrequent attacks like Heartbleed and Infiltration, highlighting potential areas for improvement in feature engineering or class imbalance handling.
 
-![Confusion Matrix - Random Forest](images/confusion_matrix/rf_confusion_matrix.png)
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center'}
+knitr::include_graphics("images/confusion_matrix/rf_confusion_matrix.png")
+```
 
 **Logistic Regression Model:** Logistic Regression provided a good baseline but did not achieve the high levels of accuracy seen in the other models. It performed well in detecting straightforward attack patterns, such as those in DDoS and Dos Hulk, but was less effective for attacks that exhibit subtler signature variations. Its primary limitation was evident in its inability to handle classes with fewer examples or more complex decision boundaries, leading to very low or zero recall in several minor attack categories.
 
-![Confusion Matrix - Logistic Regression](images/confusion_matrix/lr_confusion_matrix.png)
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center'}
+knitr::include_graphics("images/confusion_matrix/lr_confusion_matrix.png")
+```
+
+**Decision Tree Model:** The Decision Tree model offers an intuitive approach to classification by making sequential, hierarchical decisions about the data. This model's performance for classifying benign traffic and prevalent attacks such as DDoS and DoS Hulk is commendable, as shown by the significant true positive rates. Decision Trees can, however, suffer from overfitting, especially in the case of highly granular or complex datasets. Its challenges are particularly noticeable in detecting less frequent attacks, which are apparent for Heartbleed, Infiltration, and Web Attack – Sql Injection.
+
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center'}
+knitr::include_graphics("images/confusion_matrix/decision_tree_confusion_matrix.png")
+```
+
+**Feedforward Neural Network (FFNN) Model:** As a classic neural network structure, the FFNN model performs well in capturing linear relationships and, to some extent, non-linear ones through the use of multiple layers and activation functions. In this instance, the FFNN showed notable success rates in classifying benign instances and mainstream attacks. Yet, the model seems to struggle with more sophisticated attack types, suggesting that FFNN may require further parameter tuning or more complex architectures.
+
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center'}
+knitr::include_graphics("images/confusion_matrix/ffnn_confusion_matrix.png")
+```
+
+**Gradient Boosted Decision Tree (GBDT) Model:** The GBDT model leverages the power of boosting, a strategy to combine multiple weak learners (typically decision trees) into a strong classifier. This method has been successful in various classification challenges and is evident here with its robust detection across a range of attack types. The GBDT shows a good balance between detecting common and rare attack types. Nonetheless, the model's limitations are visible in its occasional misclassifications, particularly in less frequent attack types like Web Attack – Sql Injection.
+
+```{r echo=FALSE, out.width = "100%", fig.show='hold', fig.align='center'}
+knitr::include_graphics("images/confusion_matrix/gradient_boost_decision_tree_confusion_matrix.png")
+```
+
+**Gated Recurrent Unit (GRU) Model:** The GRU model, with its capacity to handle sequential data effectively, is good at capturing temporal dependencies. The GRU's confusion matrix indicates a strong performance on dominant categories like BENIGN, DDoS, and DoS Hulk. Nevertheless, there are visible challenges in accurately classifying rarer attacks such as Infiltration and Heartbleed, as well as some misclassifications amongst different types of attacks. This suggests that while GRUs are powerful, there is still room for refinement, possibly through more complex sequence modeling or by addressing class imbalances within the training data.
+
+![Confusion Matrix - Gated Recurrent Unit (GRU)](images/confusion_matrix/gru_confusion_matrix.png)
 
 ### Comparisons
 
@@ -377,8 +537,22 @@ knitr::include_graphics("images/roc_curves/rf_roc_curves.png")
 knitr::include_graphics("images/roc_curves/knn_roc_curves.png")
 knitr::include_graphics("images/roc_curves/lr_roc_curves.png")
 ```
+```{r echo=FALSE, out.width = "50%", fig.show='hold'}
+knitr::include_graphics("images/roc_curves/decision_tree_roc_curves.png")
+knitr::include_graphics("images/roc_curves/gradient_boosted_trees_roc_curves.png")
+knitr::include_graphics("images/roc_curves/ffnn_roc_curves.png")
+knitr::include_graphics("images/roc_curves/gru_roc_curves.png")
+```
 
-Here are the confusion matrices for DDoS detection. Random Forest performed the best, with only 9 false positives and 18 false negatives. KNN was the second most effective, with 21 false negatives and 23 false positives. The Bi-LSTM-CNN model ranked third, with 48 false positives and 437 false negatives. Logistic Regression was the least effective, with 240 false positives and 2285 false negatives.
+The Random Forest model showed outstanding performance, identifying DDoS attacks with only 9 false positives and 18 false negatives, positioning it as the most effective among the compared models. The GRU model also performed well, with 67 false positives and 50 false negatives, indicating its strength in capturing temporal patterns within the data. The Gradient Boosted Decision Tree model had slightly higher numbers, with 144 false positives and 153 false negatives, but still showcased a strong predictive capability.
+
+The Decision Tree model, while generally effective, presented with 35 false positives and 21 false negatives. This suggests that while the model has a good grasp of the data, it may be prone to overfitting or lack the nuanced understanding that ensemble methods provide. The FFNN model reported 38 false positives and 452 false negatives, which implies that while it's reliable in identifying non-DDoS activities, it may require a deeper network architecture or more feature engineering to improve its sensitivity towards DDoS attacks.
+
+The KNN model, known for its simplicity and effectiveness in classification tasks, resulted in 21 false positives and 23 false negatives, indicating a robust performance, particularly in a feature space where attack classes are well separated. The Bi-LSTM-CNN model, which combines the strengths of LSTM and CNN architectures for sequence data, recorded a higher number of misclassifications, with 48 false positives and 437 false negatives, suggesting the need for more tuning or additional training data to improve its performance in detecting DDoS attacks.
+
+Logistic Regression, despite being the least effective model in this assessment, with 240 false positives and 2285 false negatives, still provides valuable baseline information for model comparison and can be optimized further with regularization and feature selection techniques. 
+
+Collectively, the results reflect the advantages of ensemble and recurrent models in handling complex patterns and imbalanced datasets commonly encountered in DDoS attack detection.
 
 ```{r echo=FALSE, out.width = "50%", fig.show='hold'}
 knitr::include_graphics("images/confusion_matrix/ddos/bilstm_cnn_confusion_matrix_DDoS.png")
@@ -386,13 +560,21 @@ knitr::include_graphics("images/confusion_matrix/ddos/rf_confusion_matrix_DDoS.p
 knitr::include_graphics("images/confusion_matrix/ddos/knn_confusion_matrix_DDoS.png")
 knitr::include_graphics("images/confusion_matrix/ddos/lr_confusion_matrix_DDoS.png")
 ```
+```{r echo=FALSE, out.width = "50%", fig.show='hold'}
+knitr::include_graphics("images/confusion_matrix/ddos/decision_tree_confusion_matrix_DDoS.png")
+knitr::include_graphics("images/confusion_matrix/ddos/gradient_boosted_trees_confusion_matrix_DDoS.png")
+knitr::include_graphics("images/confusion_matrix/ddos/ffnn_confusion_matrix_DDoS.png")
+knitr::include_graphics("images/confusion_matrix/ddos/gru_confusion_matrix_DDoS.png")
+```
 
 **Success and Failure Criteria:**
 
-- **Success** is defined as achieving a detection accuracy of 95% or higher with a low rate of false positives and negatives, thereby surpassing the performance of traditional detection mechanisms. By this criterion, the Bi-LSTM-CNN model cannot be considered an unequivocal success, as it did not consistently outperform the baseline models. However, this does not imply that the model was unsuccessful. It still demonstrated high accuracy and could potentially be more robust than the baseline models, although additional testing would be necessary to substantiate such claims.
-- **Failure** would be indicated by an inability to significantly outperform the baseline models or to achieve a practical balance between detection accuracy and false positive rates. Here, the Bi-LSTM-CNN's challenges with less frequent attacks may suggest areas of failure, although its overall performance still indicates a strong potential against baseline models.
+- **Success** is defined as achieving a detection accuracy of 95% or higher with a low rate of false positives and negatives, thereby surpassing the performance of traditional detection mechanisms. In this context, the Random Forest, KNN, and Decision Tree models have demonstrated success, delivering high accuracy and maintaining a low rate of false positives and negatives. The GRU model also shows promise, particularly in capturing the temporal dynamics of network traffic, but further optimizations may be required to reduce its false negative rate.
 
-In conclusion, while the Bi-LSTM-CNN model demonstrated superior capabilities in several aspects of network attack detection, its performance variability across different attack types suggests that there is still room for improvement. Enhancing the model's ability to detect rarer attack types without compromising accuracy on more common attacks could further solidify its advantage over traditional models. Meanwhile, the baseline models, particularly Random Forest, provide robust alternatives that continue to perform competitively in many scenarios.
+- **Failure** would be indicated by an inability to significantly outperform the baseline models or to achieve a practical balance between detection accuracy and false positive rates. The Bi-LSTM-CNN model, while not a failure, exhibits a higher rate of false negatives, suggesting that it might not yet be fully suitable as a standalone detection system for all attack types. Similarly, the Gradient Boosted Decision Tree and FFNN models, despite their high accuracy, present higher false negatives, indicating room for improvement, especially in detecting more nuanced attack patterns.
+
+In conclusion, while some models have shown exemplary performance and can be deemed successful according to the defined criteria, others, including the Bi-LSTM-CNN model, have illustrated that there is potential for further refinement. Enhancing the detection of rarer attack types and maintaining high accuracy across all categories will be crucial steps in advancing these models beyond traditional detection mechanisms. The success of the ensemble and recurrent models emphasizes the value of leveraging multiple learning algorithms and temporal data analysis to improve the robustness and reliability of DDoS attack detection.
+
 
 ## Constraints
 
