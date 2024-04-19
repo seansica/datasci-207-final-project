@@ -58,7 +58,7 @@ class GradientBoostedTreesModel:
             n_estimators=n_estimators,
             objective="multi:softprob",
             num_class=self.num_classes,
-            tree_method="auto",
+            tree_method="gpu_hist" if xgb.train.is_gpu_support_enabled() else "auto",
         )
 
         # Wrap the XGBoost model in a Keras model
